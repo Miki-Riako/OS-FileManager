@@ -1,182 +1,222 @@
-from PySide6.QtCore import Qt, QSize, QUrl, QPoint, QProcess
-from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices, QColor, QFont, QSyntaxHighlighter, QTextCharFormat
-from PySide6.QtWidgets import (
-    QApplication, QLabel, QFrame, QMessageBox,
-    QWidget, QVBoxLayout,  QHBoxLayout, QVBoxLayout,
-    QStackedWidget
-    )
-from qfluentwidgets import (
-    CaptionLabel, PlainTextEdit, PushButton, CheckBox, BodyLabel, SpinBox, ComboBox, qrouter,
-    NavigationItemPosition, MessageBox, TabBar, SubtitleLabel, setFont, TabCloseButtonDisplayMode, IconWidget,
-    TransparentDropDownToolButton, TransparentToolButton, setTheme, Theme, isDarkTheme,
-    InfoBar, InfoBarPosition, InfoBarManager
-    )
-from qfluentwidgets import FluentIcon as FIF
+# from PySide6.QtCore import Qt, QSize, QUrl, QPoint, QProcess
+# from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices, QColor, QFont, QSyntaxHighlighter, QTextCharFormat
+# from PySide6.QtWidgets import (
+#     QApplication, QLabel, QFrame, QMessageBox,
+#     QWidget, QVBoxLayout,  QHBoxLayout, QVBoxLayout,
+#     QStackedWidget
+#     )
+# from qfluentwidgets import (
+#     CaptionLabel, PlainTextEdit, PushButton, CheckBox, BodyLabel, SpinBox, ComboBox, qrouter,
+#     NavigationItemPosition, MessageBox, TabBar, SubtitleLabel, setFont, TabCloseButtonDisplayMode, IconWidget,
+#     TransparentDropDownToolButton, TransparentToolButton, setTheme, Theme, isDarkTheme,
+#     InfoBar, InfoBarPosition, InfoBarManager
+#     )
+# from qfluentwidgets import FluentIcon as FIF
 
-from api.api import API
+# from api.api import API
+
+# from .highlighter import Highlighter
+
+# class Workspace(QWidget):
+#     def __init__(self, text: str, parent=None):
+#         super().__init__(parent=parent)
+#         self.api = API(self, "app")
+
+#         self.vBoxLayout = QVBoxLayout(self)
+#         self.tabBoxLayout = QHBoxLayout(self)
+#         self.tabBar = TabBar(self)
+#         self.runButton = TransparentToolButton(FIF.PLAY.icon(color=QColor(206, 206, 206) if isDarkTheme() else QColor(96, 96, 96)), self)
+#         self.stackedWidget = QStackedWidget(self)
+#         self.terminal_text = PlainTextEdit(self)
+#         self.terminal_text.setPlaceholderText("Input your string here, then press Run (Ctrl+R)")
+
+#         self.__initWidget()
+#         self.runShortcut = QShortcut(QKeySequence("Ctrl+R"), self)
+#         self.runShortcut.activated.connect(self.run)
+#         self.runButton.clicked.connect(self.run)
+#         self.setObjectName(text.replace(' ', '-'))
+
+#     def __initWidget(self):
+#         self.initLayout()
+#         self.addSubInterface(self.terminal_text, 'InputTab', self.tr('new'), FIF.COMMAND_PROMPT)
+#         qrouter.setDefaultRouteKey(self.stackedWidget, self.terminal_text.objectName())
+
+#     def initLayout(self):
+#         self.tabBar.setTabMaximumWidth(200)
+
+#         self.tabBoxLayout.addWidget(self.tabBar)
+#         self.tabBoxLayout.addWidget(self.runButton)
+#         self.vBoxLayout.addLayout(self.tabBoxLayout)
+#         self.vBoxLayout.addWidget(self.stackedWidget)
+#         self.vBoxLayout.setContentsMargins(5, 5, 5, 5)
+
+#     def addSubInterface(self, widget: PlainTextEdit, objectName, text, icon):
+#         widget.setObjectName(objectName)
+#         widget.setFont(QFont("Consolas", 20))
+#         self.highlighter = Highlighter(widget.document())
+#         self.stackedWidget.addWidget(widget)
+#         self.tabBar.addTab(
+#             routeKey=objectName,
+#             text=text,
+#             icon=icon,
+#             onClick=lambda: self.stackedWidget.setCurrentWidget(widget)
+#         )
+
+#     def warning(self, title, content):
+#         InfoBar.warning(
+#             title=title,
+#             content=content,
+#             orient=Qt.Horizontal,
+#             isClosable=True,
+#             position=InfoBarPosition.TOP,
+#             duration=2000,
+#             parent=self
+#         )
+
+#     def run(self):
+#         self.terminal_text.appendPlainText(self.api.api_io(self.terminal_text.toPlainText()))
+
+from PySide6.QtCore import Qt, QSize, QProcess # Removed unused QUrl, QPoint
+from PySide6.QtGui import QFont, QTextCursor, QColor, QKeySequence, QShortcut, QTextCharFormat # Added QColor, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QApplication # Added QLineEdit, QApplication
+)
+from qfluentwidgets import (
+    PlainTextEdit, PushButton, InfoBar, InfoBarPosition, FluentIcon as FIF, isDarkTheme
+) # Removed TabBar, StackedWidget etc.
+
+from api.api import API # from api.api import API
 
 from .highlighter import Highlighter
 
 class Workspace(QWidget):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
-
-        self.api = API()
-
-        # self.controller = controller
-        # self.helper = helper
-
-        self.cpp_process = QProcess(self)
-        self.cpp_executable_path = self.api.get_executable_path("app")
-        self.cpp_process.readyReadStandardOutput.connect(self._handle_cpp_stdout)
-        self.cpp_process.readyReadStandardError.connect(self._handle_cpp_stderr)
-        self.cpp_process.errorOccurred.connect(self._handle_cpp_process_error)
-        self.cpp_process.finished.connect(self._handle_cpp_process_finished)
-
-        self.vBoxLayout = QVBoxLayout(self)
-        self.tabBoxLayout = QHBoxLayout(self)
-        self.tabBar = TabBar(self)
-        self.runButton = TransparentToolButton(FIF.PLAY.icon(color=QColor(206, 206, 206) if isDarkTheme() else QColor(96, 96, 96)), self)
-        self.stackedWidget = QStackedWidget(self)
-        self.new_edit = PlainTextEdit(self)
-        self.new_edit.setPlaceholderText("Input your string here, then press Run (Ctrl+R)")
-
-        # terminal = 'input your string'
-        # self.new_edit.setPlainText(terminal)
-        self.__initWidget()
-        self.saveShortcut = QShortcut(QKeySequence("Ctrl+S"), self)
-        self.saveShortcut.activated.connect(self.save)
-        self.runShortcut = QShortcut(QKeySequence("Ctrl+R"), self)
-        self.runShortcut.activated.connect(self.run)
-        self.runButton.clicked.connect(self.run)
         self.setObjectName(text.replace(' ', '-'))
 
-        self._start_cpp_process_if_not_running()
+        self.vBoxLayout = QVBoxLayout(self)
 
-    def __initWidget(self):
-        self.initLayout()
-        self.addSubInterface(self.new_edit, 'InputTab', self.tr('new'), FIF.COMMAND_PROMPT)
-        qrouter.setDefaultRouteKey(self.stackedWidget, self.new_edit.objectName())
+        # 输出区域
+        self.output_area = PlainTextEdit(self)
+        self.output_area.setReadOnly(True)
+        self.output_area.setFont(QFont("Consolas", 11))
+        self.output_area.setPlaceholderText("Process output will appear here...")
+        self.highlighter = Highlighter(self.output_area.document()) # 你的语法高亮器
 
-    def initLayout(self):
-        self.tabBar.setTabMaximumWidth(200)
+        # 输入区域
+        self.input_layout = QHBoxLayout()
+        self.input_prompt_label = QLabel(">", self) # 模拟一个提示符
+        self.input_line = QLineEdit(self)
+        self.input_line.setFont(QFont("Consolas", 11))
+        self.input_line.setPlaceholderText("Enter command and press Enter")
+        
+        # (可选) 发送按钮，如果不想只依赖回车
+        # self.send_button = PushButton(FIF.SEND, "Send", self)
+        # self.input_layout.addWidget(self.send_button)
 
-        self.tabBoxLayout.addWidget(self.tabBar)
-        self.tabBoxLayout.addWidget(self.runButton)
-        self.vBoxLayout.addLayout(self.tabBoxLayout)
-        self.vBoxLayout.addWidget(self.stackedWidget)
+        self.input_layout.addWidget(self.input_prompt_label)
+        self.input_layout.addWidget(self.input_line, 1) # 输入行占据主要空间
+
+        self.vBoxLayout.addWidget(self.output_area, 1) # 输出区域占据主要垂直空间
+        self.vBoxLayout.addLayout(self.input_layout)
         self.vBoxLayout.setContentsMargins(5, 5, 5, 5)
 
-    def addSubInterface(self, widget: PlainTextEdit, objectName, text, icon):
-        widget.setObjectName(objectName)
-        widget.setFont(QFont("Consolas", 20))
-        self.highlighter = Highlighter(widget.document())
-        self.stackedWidget.addWidget(widget)
-        self.tabBar.addTab(
-            routeKey=objectName,
-            text=text,
-            icon=icon,
-            onClick=lambda: self.stackedWidget.setCurrentWidget(widget)
-        )
+        # --- API 实例化和信号连接 ---
+        # 重要: 将 "app" 替换为你的 C++ 编译出的可执行文件名 (不含.exe后缀)
+        self.cpp_executable_name = "app"
+        self.api = API(self, self.cpp_executable_name)
 
-    def save(self):
-        InfoBar.success(
-            title='Save',
-            content="You pressed Ctrl+S. Waiting for save to be implemented...",
+        if not self.api.executable_path: # API未能找到可执行文件
+            self._append_to_output(f"Error: Executable '{self.cpp_executable_name}' not found. Terminal cannot start.\n", is_error=True)
+            self.input_line.setEnabled(False)
+        else:
+            # 连接API的信号到Workspace的槽
+            self.api.standardOutputReady.connect(self._append_to_output)
+            self.api.standardErrorReady.connect(lambda text: self._append_to_output(text, is_error=True))
+            self.api.processFinished.connect(self._on_process_terminated)
+            self.api.processErrorOccurred.connect(self._on_api_process_error)
+
+            # 连接用户输入
+            self.input_line.returnPressed.connect(self._send_input_from_user)
+            # if hasattr(self, 'send_button'):
+            #     self.send_button.clicked.connect(self._send_input_from_user)
+
+            # 初始化时，如果进程未能立即启动 (例如API中waitForStarted超时)，输入可能仍是禁用的
+            # 我们会在第一次收到输出或错误时启用它，或者在API错误时保持禁用
+            if not self.api.is_running() and self.api.process.error() == QProcess.ProcessError.Timedout:
+                self._append_to_output("Waiting for process to start...\n", is_error=True) # 提示用户
+                self.input_line.setEnabled(False)
+            elif self.api.is_running():
+                 self.input_line.setEnabled(True)
+                 self.input_line.setFocus()
+            else: # 其他启动失败的情况
+                self.input_line.setEnabled(False)
+        
+        self.setFocusProxy(self.input_line) # 当Workspace获得焦点时，实际给输入行
+
+    def _append_to_output(self, text: str, is_error: bool = False):
+        cursor = self.output_area.textCursor()
+        cursor.movePosition(QTextCursor.End)
+
+        # 为错误文本设置不同颜色
+        original_format = cursor.charFormat()
+        if is_error:
+            error_format = QTextCharFormat(original_format)
+            error_color = QColor(255, 80, 80) if isDarkTheme() else QColor(200, 0, 0)
+            error_format.setForeground(error_color)
+            cursor.setCharFormat(error_format)
+        
+        cursor.insertText(text)
+        
+        if is_error: # 恢复原始格式
+            cursor.setCharFormat(original_format)
+            
+        self.output_area.ensureCursorVisible()
+
+        # 如果之前输入被禁用且进程现在是运行的 (例如，延迟启动后收到第一个输出)
+        if not self.input_line.isEnabled() and self.api and self.api.is_running():
+            self.input_line.setEnabled(True)
+            self.input_line.setFocus()
+
+
+    def _on_process_terminated(self, exit_code: int, exit_status: QProcess.ExitStatus):
+        status_text = "normally" if exit_status == QProcess.ExitStatus.NormalExit else "unexpectedly (crashed?)"
+        self._append_to_output(
+            f"\n--- Process '{self.cpp_executable_name}' terminated {status_text} (Exit Code: {exit_code}) ---\n",
+            is_error=(exit_status != QProcess.ExitStatus.NormalExit)
+        )
+        self.input_line.setEnabled(False) # 进程结束后禁用输入
+        # self.input_line.clear()
+
+    def _on_api_process_error(self, error_message: str):
+        self._append_to_output(f"Process Error: {error_message}\n", is_error=True)
+        self.input_line.setEnabled(False) # 发生错误，禁用输入
+
+    def _send_input_from_user(self):
+        if not self.api or not self.api.is_running():
+            self._append_to_output("Cannot send input: Process is not running.\n", is_error=True)
+            return
+
+        command = self.input_line.text()
+        if command: # 只发送非空命令
+            # (可选) 在输出区域回显用户输入的命令，模仿终端行为
+            # self._append_to_output(f"{self.input_prompt_label.text()} {command}\n")
+            
+            self.api.send_input_to_process(command)
+            self.input_line.clear() # 清空输入行
+
+    def warning(self, title, content):
+        InfoBar.warning(
+            title=title,
+            content=content,
             orient=Qt.Horizontal,
             isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=2000,
-            parent=self
+            position=InfoBarPosition.TOP_RIGHT,
+            duration=3000,
+            parent=self.window() or self # 确保InfoBar有合适的父对象
         )
 
-    def _start_cpp_process_if_not_running(self):
-        if self.cpp_process.state() == QProcess.ProcessState.NotRunning:
-            InfoBar.success(
-                title='C++ Process',
-                content=f"Starting: {self.cpp_executable_path}",
-                orient=Qt.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=2000,
-                parent=self
-            )
-            self.cpp_process.start(self.cpp_executable_path, [])
-            if not self.cpp_process.waitForStarted(3000):
-                error_msg = f"Failed to start C++: {self.cpp_process.errorString()}"
-                InfoBar.error("C++ Error", error_msg, parent=self, duration=5000)
-                self.runButton.setEnabled(False)
-                return False
-            else:
-                InfoBar.success("C++ Process", "C++ backend started.", parent=self, duration=2000)
-                self.runButton.setEnabled(True)
-                return True
-        return True # Already running or successfully started
-
-    def run(self):
-        if not self._start_cpp_process_if_not_running():
-            InfoBar.error("Run Error", "C++ backend is not running and could not be started.", parent=self, duration=3000)
-            return
-
-        # Get the text from the PlainTextEdit (which you referred to as 'terminal')
-        input_string = self.new_edit.toPlainText()
-
-        if not input_string.strip():
-            InfoBar.info("Input", "Input is empty.", parent=self, duration=2000)
-            return
-
-        # For this simple test, we'll send the entire content as one block,
-        # assuming C++ handles it or expects a single line.
-        # C++ app must read a line, process, print a line, then loop to read next.
-        # Ensure your C++ app's loop is correct (e.g., `while(std::getline(std::cin, line))`).
-
-        self.new_edit.appendPlainText(f"\n>>> Sending to C++: {input_string.splitlines()[0]}...") # Show what's sent
-        self.cpp_process.write(f"{input_string}\n".encode('utf-8')) # Send with newline
-        # self.cpp_process.waitForBytesWritten(100) # Optional: if you want to be sure it's written
-
-        # Output from C++ will be handled by `_handle_cpp_stdout` and appended to `self.new_edit`
-
-    def _handle_cpp_stdout(self):
-        if self.cpp_process:
-            output_bytes = self.cpp_process.readAllStandardOutput()
-            output_string = output_bytes.data().decode('utf-8', errors='ignore').strip()
-            if output_string:
-                # Append C++ output directly to the same PlainTextEdit for simplicity
-                self.new_edit.appendPlainText(f"<<< From C++: {output_string}")
-                # Auto-scroll to the end
-                cursor = self.new_edit.textCursor()
-                cursor.movePosition(cursor.MoveOperation.End)
-                self.new_edit.setTextCursor(cursor)
-
-    def _handle_cpp_stderr(self):
-        if self.cpp_process:
-            error_bytes = self.cpp_process.readAllStandardError()
-            error_string = error_bytes.data().decode('utf-8', errors='ignore').strip()
-            if error_string:
-                self.new_edit.appendPlainText(f"<font color='red'>C++ STDERR: {error_string}</font>")
-                InfoBar.error("C++ STDERR", error_string, parent=self, duration=5000)
-
-    def _handle_cpp_process_error(self, error: QProcess.ProcessError):
-        if self.cpp_process:
-            error_msg = f"C++ Process Error: {self.cpp_process.errorString()} (Code: {error})"
-            self.new_edit.appendPlainText(f"<font color='red'>{error_msg}</font>")
-            InfoBar.critical("C++ Critical Error", error_msg, parent=self, duration=0)
-            self.runButton.setEnabled(False)
-
-    def _handle_cpp_process_finished(self, exitCode: int, exitStatus: QProcess.ExitStatus):
-        status_str = "C++ Process Finished. "
-        if exitStatus == QProcess.ExitStatus.NormalExit:
-            status_str += f"Exited normally (code: {exitCode})."
-        else:
-            status_str += f"Crashed (code: {exitCode})."
-        self.new_edit.appendPlainText(f"<font color='orange'>{status_str} Please restart app or C++ process if needed.</font>")
-        InfoBar.warning("C++ Process", status_str, parent=self, duration=5000)
-        self.runButton.setEnabled(False) # Process ended
-
     def closeEvent(self, event):
-        if self.cpp_process and self.cpp_process.state() == QProcess.ProcessState.Running:
-            InfoBarManager.info("Exiting", "Terminating C++ process...", parent=self)
-            self.cpp_process.terminate()
-            if not self.cpp_process.waitForFinished(1000): # Shorter wait for simple test
-                self.cpp_process.kill()
+        if hasattr(self, 'api') and self.api:
+            self.api.stop_process()
         super().closeEvent(event)
