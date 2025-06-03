@@ -47,18 +47,15 @@ class Workspace(QWidget):
         return self.stackedWidget.findChild(PlainTextEdit, object_name)
 
     def _append_to_terminal(self, text_edit: PlainTextEdit, text: str, is_error: bool = False):
-        """
-        辅助方法：向指定 PlainTextEdit 追加文本，并处理光标和可能的颜色。
-        这个方法现在更简单，因为它假定 Shell 会自己处理命令回显和新提示符。
-        """
-        if is_error: # 设置文本颜色（可选，用于区分错误信息）
-            original_format = text_edit.currentCharFormat()
-            error_format = QTextCharFormat(original_format)
-            error_format.setForeground(QColor("red"))
-            text_edit.setCurrentCharFormat(error_format)
+        """辅助方法：向指定 PlainTextEdit 追加文本，并处理光标和可能的颜色。"""
+        # if is_error: # 设置文本颜色
+        #     original_format = text_edit.currentCharFormat()
+        #     error_format = QTextCharFormat(original_format)
+        #     error_format.setForeground(QColor("red"))
+        #     text_edit.setCurrentCharFormat(error_format)
         text_edit.insertPlainText(text) # 追加新文本
-        if is_error: # 恢复原始文本颜色
-            text_edit.setCurrentCharFormat(original_format)
+        # if is_error: # 恢复原始文本颜色
+        #     text_edit.setCurrentCharFormat(original_format)
         cursor = text_edit.textCursor() # 确保光标和滚动条在最底部，保持用户体验
         cursor.movePosition(QTextCursor.End)
         text_edit.setTextCursor(cursor)
@@ -69,7 +66,7 @@ class Workspace(QWidget):
         text_edit = self._get_terminal_widget_by_object_name(terminal_object_name)
         if text_edit:
             self._append_to_terminal(text_edit, output, is_error)
-            self._append_to_terminal(text_edit, "$ ")
+            self._append_to_terminal(text_edit, "")
 
     def _handle_api_finished(self, terminal_object_name: str, exitCode: int, exitStatus: QProcess.ExitStatus):
         """处理来自 API 的进程结束信号。"""
@@ -94,9 +91,7 @@ class Workspace(QWidget):
             self._append_to_terminal(text_edit, "host $login: ") # 确保提示符在末尾
 
     def _send_command_to_current_terminal(self, text_edit: PlainTextEdit):
-        """
-        从 PlainTextEdit 中获取用户输入的命令，并通过 API 发送给对应的 Shell。
-        """
+        """从 PlainTextEdit 中获取用户输入的命令，并通过 API 发送给对应的 Shell。"""
         prompt = "$ " # 确保与 addTerminalTab 和 _handle_api_output 中的提示符一致
 
         full_text = text_edit.toPlainText()
@@ -114,7 +109,8 @@ class Workspace(QWidget):
             cursor.removeSelectedText()
             text_edit.setTextCursor(cursor)
             # 然后重新打印出用户输入和提示符，形成一条完整的历史记录
-            text_edit.insertPlainText(prompt + input_data + '\n')
+            text_edit.insertPlainText(input_data + '\n')
+            # text_edit.insertPlainText(prompt + input_data + '\n')
 
 
             # 获取当前终端对应的 API 实例
@@ -218,7 +214,7 @@ class Workspace(QWidget):
 
         terminal_api = self.terminal_apis.get(route_key)
         if terminal_api:
-            terminal_api.terminate_shell() # 告诉 API 终止其管理的 Shell 进程
+            terminal_api.terminate_app_process() # 告诉 API 终止其管理的 Shell 进程
             del self.terminal_apis[route_key] # 从字典中移除引用
             terminal_api.deleteLater() # 销毁 API 对象
 

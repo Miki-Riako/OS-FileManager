@@ -1,6 +1,5 @@
 import re
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
-from PySide6.QtCore import Qt # Qt.UserRole + N for custom roles if needed
 
 SHELL_COMMANDS = [
     'ls', 'cd', 'pwd', 'mkdir', 'rm', 'cp', 'mv', 'cat', 'echo', 'grep',

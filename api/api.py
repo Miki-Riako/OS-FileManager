@@ -26,14 +26,15 @@ class API(QObject):
         self.process.errorOccurred.connect(self._on_qprocess_error_occurred)
 
     def _get_executable_path(self, executable_name):
-        """在 'bin' 目录下查找可执行文件的完整路径。"""
+        """在目录下查找可执行文件的完整路径。"""
         root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bin_dir = os.path.join(root_dir, "bin")
+        executable_dir = os.path.join(root_dir, "build")
+        # executable_dir = os.path.join(root_dir, "bin")
 
-        # if sys.platform == 'win32' and not executable_name.lower().endswith(('.py', '.bat', '.cmd', '.exe')):
-        #     executable_name += ".exe"
+        if sys.platform == 'win32' and not executable_name.lower().endswith(('.py', '.bat', '.cmd', '.exe')):
+            executable_name += ".exe"
 
-        full_path = os.path.join(bin_dir, executable_name)
+        full_path = os.path.join(executable_dir, executable_name)
 
         if not os.path.exists(full_path): # 不在这里直接显示 warning，而是返回 None，让调用者处理
             print(f"[API._get_executable_path] Error: Executable not found at '{full_path}'")
