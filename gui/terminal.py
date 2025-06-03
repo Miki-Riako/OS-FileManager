@@ -3,7 +3,7 @@ import re
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize, QProcess, QEvent, QTimer
+from PySide6.QtCore import Qt, QSize, QProcess, QEvent, QTimer, Signal
 from PySide6.QtGui import QFont, QTextCursor, QColor, QKeySequence, QShortcut, QTextCharFormat
 from PySide6.QtWidgets import (
     QApplication, QLabel, QFrame, QMessageBox,
@@ -27,12 +27,14 @@ class TerminalInputMode:
     LOGIN_USERNAME = "LOGIN_USERNAME" # 登录：等待用户名
     LOGIN_PASSWORD = "LOGIN_PASSWORD" # 登录：等待密码
     SUDO_PASSWORD = "SUDO_PASSWORD" # Sudo：等待密码
+    INITIALIZING = "INITIALIZING" # 表示 Shell 刚刚启动，等待登录
 
 class Terminal(QWidget):
+    explorerCommandOutputReady = Signal(str, str, bool, str) # 用于 Explorer
+    requestExplorerRefresh = Signal()
+
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
-        # self.api = API(self, "app")
-
         self.setConfig()
 
         self.vBoxLayout = QVBoxLayout(self)
@@ -47,6 +49,11 @@ class Terminal(QWidget):
         self.terminal_modes = {}
         self.password_buffers = {}
 
+        # 状态追踪：用于Explorer的命令执行
+        self._explorer_pending_requests = {} # {terminal_object_name: {"output_buffer": []}}
+        self._explorer_current_api_obj_name = None # 当前Explorer正在使用的API实例的object_name
+        self._explorer_command_sent_at_index = -1 # 标记命令发送时PlaintextEdit的文本长度
+
         self.login_username_prompt_regex = re.compile(r"host@login:Username\$ ")
         self.login_password_prompt_regex = re.compile(r"host@login:Password\$ ")
         self.sudo_password_prompt_regex = re.compile(r"\[sudo\] password for .*?:\s")
@@ -56,17 +63,38 @@ class Terminal(QWidget):
         self.runButton.clicked.connect(self.run)
         self.setObjectName(text.replace(' ', '-'))
 
+    def __initWidget(self):
+        self.__initLayout()
+        self.tabBar.currentChanged.connect(self.onTabChanged)
+        self.tabBar.tabAddRequested.connect(self.onTabAddRequested)
+        self.tabBar.tabCloseRequested.connect(self.onTabCloseRequested)
+        self.onTabAddRequested()
+
+    def __initLayout(self):
+        self.tabBar.setTabMaximumWidth(200)
+        self.tabBar.setCloseButtonDisplayMode(TabCloseButtonDisplayMode.ON_HOVER)
+
+        self.tabBoxLayout.addWidget(self.tabBar)
+        self.tabBoxLayout.addWidget(self.runButton)
+        self.vBoxLayout.addLayout(self.tabBoxLayout)
+        self.vBoxLayout.addWidget(self.stackedWidget)
+        self.vBoxLayout.setContentsMargins(5, 5, 5, 5)
+
     def _get_terminal_widget_by_object_name(self, object_name: str) -> PlainTextEdit:
         """根据 objectName 获取对应的 PlainTextEdit 实例。"""
         return self.stackedWidget.findChild(PlainTextEdit, object_name)
 
     def _append_to_terminal(self, text_edit: PlainTextEdit, text: str, is_error: bool = False, is_prompt: bool = False):
         """辅助方法：向指定 PlainTextEdit 追加文本，并处理光标和可能的颜色。"""
+        if '\x0c' in text: # 移除换页符，防止它干扰后续文本显示和高亮
+            text = text.replace('\x0c', '')
+
         cursor = text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
         text_edit.setTextCursor(cursor)
         text_edit.insertPlainText(text)
 
+        # 确保光标在文本末尾并可见
         cursor.movePosition(QTextCursor.End)
         text_edit.setTextCursor(cursor)
         text_edit.ensureCursorVisible()
@@ -80,12 +108,14 @@ class Terminal(QWidget):
             (self.sudo_password_prompt_regex, TerminalInputMode.SUDO_PASSWORD),
             (self.main_shell_prompt_regex, TerminalInputMode.NORMAL)
         ]
+        search_text = full_text[-2000:] # 检查最后个字符，避免对超长文本进行全匹配
+
         for regex, mode in prompt_patterns: # 遍历所有提示符类型，找到它们在 full_text 中最后一次出现的位置
             match = None
-            for m in regex.finditer(full_text): # 使用 finditer 找到所有匹配，并取最后一个（最靠后的）
+            for m in regex.finditer(search_text): # 使用 finditer 找到所有匹配，并取最后一个（最靠后的）
                 match = m
-            if match:
-                potential_prompts.append((match.end(), mode))
+            if match: # 转换回 full_text 的绝对位置
+                potential_prompts.append((len(full_text) - len(search_text) + match.end(), mode))
 
         potential_prompts.sort(key=lambda x: x[0]) # 根据匹配的结束位置进行排序，最新的提示符在列表末尾
         new_mode = TerminalInputMode.NORMAL # 默认模式和输入位置：如果没有识别到特定提示符，则默认为普通模式，输入位置在文本末尾
@@ -95,6 +125,12 @@ class Terminal(QWidget):
             latest_match_end_pos, latest_mode = potential_prompts[-1] # 取列表中最后一个（即位置最靠后，最新的）提示符来决定当前模式和输入起始位置
             new_mode = latest_mode
             new_input_start_index = latest_match_end_pos
+        else:
+            if not full_text.strip() and self.terminal_apis.get(self.stackedWidget.currentWidget().objectName()).state() == QProcess.Running:
+                new_mode = TerminalInputMode.INITIALIZING
+            else: # 否则，默认为正常模式，等待用户输入
+                new_mode = TerminalInputMode.NORMAL
+
 
         return new_mode, new_input_start_index
 
@@ -103,10 +139,6 @@ class Terminal(QWidget):
         text_edit = self._get_terminal_widget_by_object_name(terminal_object_name)
         if not text_edit:
             return
-        if '\x0c' in output:
-            # text_edit.clear()
-            output = output.replace('\x0c', '') # 移除换页符，防止它干扰后续文本显示和高亮
-
         self._append_to_terminal(text_edit, output, is_error)
         full_text = text_edit.document().toPlainText()
 
@@ -114,10 +146,45 @@ class Terminal(QWidget):
         self.input_start_indices[terminal_object_name]\
             = self._determine_terminal_state(full_text)
 
-        cursor = text_edit.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        text_edit.setTextCursor(cursor)
-        text_edit.ensureCursorVisible()
+        if terminal_object_name == self._explorer_current_api_obj_name and self._explorer_command_sent_at_index != -1:
+            self._handle_api_for_explorer(terminal_object_name, output, is_error, full_text)
+
+    def _handle_api_for_explorer(self, terminal_object_name: str, output: str, is_error, full_text: str):
+        """处理来自 API 的标准输出信号，专门用于 Explorer。"""
+        if terminal_object_name not in self._explorer_pending_requests:
+            print(f"[Explorer] Warning: _explorer_pending_requests not initialized for {terminal_object_name}. Ignoring output.")
+            return
+        request_info = self._explorer_pending_requests[terminal_object_name]
+        request_info["output_buffer"].append(output) # 累积所有输出
+        full_buffered_output = "".join(request_info["output_buffer"])
+        current_mode = self.terminal_modes.get(terminal_object_name)
+        command_is_complete = False
+        if current_mode == TerminalInputMode.NORMAL: # 只有当处于 NORMAL 模式时才检查完成
+            prompt_matches = list(self.main_shell_prompt_regex.finditer(full_buffered_output))
+            if prompt_matches:
+                last_prompt_match = prompt_matches[-1]
+                if full_buffered_output[last_prompt_match.start():].strip() == last_prompt_match.group(0).strip():
+                    command_is_complete = True
+        if command_is_complete:
+            self.explorerCommandOutputReady.emit(
+                terminal_object_name,
+                full_buffered_output, # 发送所有收集到的输出
+                not is_error, # 假设成功，如果不是来自错误流
+                "" # 无特定错误信息
+            )
+            self._explorer_command_sent_at_index = -1
+            self._explorer_current_api_obj_name = None
+            request_info["output_buffer"].clear()
+
+    def _send_explorer_error(self, terminal_object_name, error_message):
+        self.explorerCommandOutputReady.emit(
+            terminal_object_name,
+            "", # 无输出
+            False, # 失败
+            error_message
+        )
+        self._explorer_command_sent_at_index = -1
+        self._explorer_current_api_obj_name = None
 
     def _handle_api_finished(self, terminal_object_name: str, exitCode: int, exitStatus: QProcess.ExitStatus):
         """处理来自 API 的进程结束信号。"""
@@ -127,9 +194,11 @@ class Terminal(QWidget):
             self._append_to_terminal(text_edit, f"\n进程已结束，退出码: {exitCode} ({status_str})\n", is_error=True)
             terminal_api = self.terminal_apis.get(terminal_object_name) # 进程结束后重新启动Shell。新的提示符会在 API 重新启动成功后打印
             if terminal_api:
-                self._append_to_terminal(text_edit, "\n尝试重新启动 Shell...\n")
+                self._append_to_terminal(text_edit, "尝试重新启动 Shell...\n")
                 if not terminal_api.start_app_process(): # 重新启动应用程序
                     self._append_to_terminal(text_edit, "重新启动 Shell 失败。\n", is_error=True)
+                    if terminal_object_name == self._explorer_current_api_obj_name:
+                        self._send_explorer_error(terminal_object_name, f"Shell process crashed or failed to restart: {status_str}")
 
     def _handle_api_error_occurred(self, terminal_object_name: str, error_message: str):
         """处理来自 API 的 QProcess 错误信号。"""
@@ -141,6 +210,8 @@ class Terminal(QWidget):
             cursor.movePosition(QTextCursor.End)
             text_edit.setTextCursor(cursor)
             text_edit.ensureCursorVisible()
+            if terminal_object_name == self._explorer_current_api_obj_name:
+                self._send_explorer_error(terminal_object_name, f"API process error: {error_message}")
 
     def _send_command_to_current_terminal(self, text_edit: PlainTextEdit):
         """从 PlainTextEdit 中获取用户输入的命令，并通过 API 发送给对应的 Shell。"""
@@ -169,45 +240,68 @@ class Terminal(QWidget):
             self.input_start_indices[object_name] = len(text_edit.document().toPlainText())
             cursor.movePosition(QTextCursor.End); text_edit.setTextCursor(cursor)
             return
-
+        # 特殊处理 'clear' 命令
         if input_data.strip().lower() == "clear" and current_mode == TerminalInputMode.NORMAL:
             text_edit.clear()
-            self.input_start_indices[object_name] = 0
-            terminal_api.send_input_to_app(input_data)
+            self.input_start_indices[object_name] = 0 # 重置输入起始位置
+            terminal_api.send_input_to_app(input_data) # 仍然将命令发送给后端
             return
-
+        # 删除用户在PlaintextEdit中输入的部分（如果是密码模式则无实际可见删除）
         cursor.setPosition(input_start_index)
         cursor.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
         cursor.removeSelectedText()
         text_edit.setTextCursor(cursor)
-
+        # 模拟用户在UI上看到输入
         if current_mode == TerminalInputMode.NORMAL:
             text_edit.insertPlainText(input_data + '\n') # 重新插入用户输入的命令，后面跟一个换行符，模拟用户按Enter
-        else:
+        else: # 密码模式只插入换行符，不显示密码
             text_edit.insertPlainText('\n')
-        terminal_api.send_input_to_app(input_data)
 
+        terminal_api.send_input_to_app(input_data)
+        self.input_start_indices[object_name] = len(text_edit.document().toPlainText()) # 更新输入起始位置到当前文本末尾
         cursor = text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
         text_edit.setTextCursor(cursor)
         text_edit.ensureCursorVisible()
 
-    def __initWidget(self):
-        self.__initLayout()
-        self.tabBar.currentChanged.connect(self.onTabChanged)
-        self.tabBar.tabAddRequested.connect(self.onTabAddRequested)
-        self.tabBar.tabCloseRequested.connect(self.onTabCloseRequested)
-        self.onTabAddRequested()
+    def get_current_api(self) -> API | None:
+        """返回当前激活的终端标签页对应的 API 实例。"""
+        current_tab_item = self.tabBar.currentTab()
+        if not current_tab_item:
+            return None
+        current_object_name = current_tab_item.routeKey()
+        return self.terminal_apis.get(current_object_name)
 
-    def __initLayout(self):
-        self.tabBar.setTabMaximumWidth(200)
-        self.tabBar.setCloseButtonDisplayMode(TabCloseButtonDisplayMode.ON_HOVER)
+    def get_terminal_mode(self, terminal_object_name: str) -> TerminalInputMode:
+        return self.terminal_modes.get(terminal_object_name, TerminalInputMode.INITIALIZING)
 
-        self.tabBoxLayout.addWidget(self.tabBar)
-        self.tabBoxLayout.addWidget(self.runButton)
-        self.vBoxLayout.addLayout(self.tabBoxLayout)
-        self.vBoxLayout.addWidget(self.stackedWidget)
-        self.vBoxLayout.setContentsMargins(5, 5, 5, 5)
+    def execute_command_for_explorer(self, command: str) -> bool:
+        """为 Explorer 执行命令。命令的输出会通过 explorerCommandOutputReady 信号发出。返回 True 表示命令已发送，False 表示无法发送（如无活跃终端）。 """
+        api = self.get_current_api()
+        if not api:
+            self.warning("警告", "没有激活的终端API实例可供Explorer使用。")
+            self.explorerCommandOutputReady.emit("", "", False, "No active terminal API for Explorer.")
+            return False
+        terminal_obj_name = api.terminal_object_name
+        text_edit = self._get_terminal_widget_by_object_name(terminal_obj_name)
+        if not text_edit:
+            self.warning("警告", f"未找到终端UI组件 '{terminal_obj_name}'。")
+            self.explorerCommandOutputReady.emit(terminal_obj_name, "", False, f"No UI widget for '{terminal_obj_name}'.")
+            return False
+        if self._explorer_current_api_obj_name is not None:
+            self.warning("警告", "Explorer命令正在进行中，请稍后。")
+            self.explorerCommandOutputReady.emit(terminal_obj_name, "", False, "Another Explorer command is already in progress.")
+            return False
+        current_terminal_mode = self.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self._send_explorer_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。")
+            return False
+        self._explorer_current_api_obj_name = terminal_obj_name
+        self._explorer_command_sent_at_index = len(text_edit.document().toPlainText()) # 记录当前文本长度。
+        self._explorer_pending_requests[terminal_obj_name] = {"output_buffer": []} # 初始化或清空缓冲
+        self._append_to_terminal(text_edit, command + '\n') # 注意：这行内容是 GUI 自己的显示，不是来自 Shell 的回显
+        api.send_input_to_app(command)
+        return True
 
     def setConfig(self):
         config_file_path = Path(__file__).resolve().parent.parent / "config" / "config.json"
@@ -252,38 +346,41 @@ class Terminal(QWidget):
                     elif current_cursor.position() < input_start_index:
                         return True # 阻止删除
                     if is_password_or_sudo_mode:
-                        pass # 为了简单且符合常见终端行为，对于密码输入，通常忽略 Delete 键。
+                        return True # 阻止 Delete 键的默认行为
                 if is_password_or_sudo_mode: # 处理密码输入模式下的字符显示 (什么都不显示)
-                    if current_cursor.position() < input_start_index: # 如果光标不在用户输入区域，先强制移到正确位置
+                    # 如果光标不在用户输入区域（提示符后面），强制移到正确位置
+                    if current_cursor.position() < input_start_index:
                         current_cursor.setPosition(input_start_index)
                         text_edit.setTextCursor(current_cursor)
                     if key_text and key_text.isprintable(): # 对于所有可打印字符，添加到内部缓冲区，但不显示在 PlainTextEdit 上
-                        password_buffer = self.password_buffers.get(object_name, "") # 获取当前密码缓冲区，如果不存在则初始化
+                        password_buffer = self.password_buffers.get(object_name, "")
                         self.password_buffers[object_name] = password_buffer + key_text
-                        text_edit.textCursor().movePosition(QTextCursor.EndOfLine) # 确保光标仍然在正确位置，但不要插入任何字符
+                        current_cursor = text_edit.textCursor() # 确保光标在文本末尾，但不要插入任何字符到 PlainTextEdit
+                        current_cursor.movePosition(QTextCursor.End)
+                        text_edit.setTextCursor(current_cursor)
                         return True # 消费事件，阻止 PlainTextEdit 默认处理 (即显示字符)
                 return super().eventFilter(watched_object, event) # 如果不是密码模式，或不是特殊处理的键，则允许 PlainTextEdit 正常处理
-            elif event.type() == QEvent.Type.MouseButtonPress: #  阻止鼠标点击/拖动光标到提示符之前
+            elif event.type() == QEvent.Type.MouseButtonPress: # 阻止鼠标点击/拖动光标到提示符之前
                 text_edit = watched_object
                 object_name = text_edit.objectName()
                 input_start_index = self.input_start_indices.get(object_name, 0)
                 cursor_at_click = text_edit.cursorForPosition(event.position().toPoint())
                 if cursor_at_click.position() < input_start_index:
                     QTimer.singleShot(0, lambda: text_edit.textCursor().setPosition(input_start_index))
+                    return True # 消费事件，阻止默认行为
+            elif event.type() == QEvent.Type.ContextMenu: # 阻止右键菜单，如果需要
+                return True # 阻止右键菜单
         return super().eventFilter(watched_object, event)
 
     def addTerminalTab(self, widget: PlainTextEdit, objectName, text, icon):
         widget.setObjectName(objectName)
         widget.setFont(QFont(self.font_family, self.font_size))
         widget.setPlaceholderText("Command prompt...")
-
-        self.terminal_modes[objectName] = TerminalInputMode.NORMAL
+        self.terminal_modes[objectName] = TerminalInputMode.INITIALIZING # 初始化模式为 INITIALIZING，等待 Shell 启动和登录
         self.password_buffers[objectName] = "" # 初始化密码缓冲区为空字符串
-
         cursor = widget.textCursor()
         cursor.movePosition(QTextCursor.End)
         widget.setTextCursor(cursor)
-
         widget.installEventFilter(self)
         Highlighter(widget.document())
         self.stackedWidget.addWidget(widget)
@@ -292,8 +389,7 @@ class Terminal(QWidget):
             text=text,
             icon=icon
         )
-        # self.tabBar.setCurrentTab(objectName) # !!!不知道为什么有未知的bug会导致切换时文本不变但进程改变，暂时不切换，让用户手动切换
-
+        # self.tabBar.setCurrentTab(objectName) # 有bug暂时别用
         terminal_api = API(objectName, "app", self)
         self.terminal_apis[objectName] = terminal_api # 存储起来
         terminal_api.standardOutputReady.connect(self._handle_api_output)
@@ -301,17 +397,25 @@ class Terminal(QWidget):
         terminal_api.processFinished.connect(self._handle_api_finished)
         terminal_api.processErrorOccurred.connect(self._handle_api_error_occurred)
         if not terminal_api.start_app_process():
-            pass
+            self.warning("启动失败", f"无法启动终端进程 {objectName}。")
 
     def onTabCloseRequested(self, index: int):
         tab_item = self.tabBar.tabItem(index)
         route_key = tab_item.routeKey()
+        if route_key == self._explorer_current_api_obj_name: # 如果关闭的是 Explorer 正在使用的终端，重置 Explorer 的状态
+            self._explorer_current_api_obj_name = None
+            self._explorer_command_sent_at_index = -1
+            self._explorer_pending_requests.pop(route_key, None)
 
         terminal_api = self.terminal_apis.get(route_key)
         if terminal_api:
             terminal_api.terminate_app_process() # 告诉 API 终止其管理的 Shell 进程
             del self.terminal_apis[route_key] # 从字典中移除引用
             terminal_api.deleteLater() # 销毁 API 对象
+
+        self.terminal_modes.pop(route_key, None) # 移除模式和密码缓冲区状态
+        self.input_start_indices.pop(route_key, None)
+        self.password_buffers.pop(route_key, None)
 
         widget_to_remove = self.stackedWidget.findChild(PlainTextEdit, route_key)
         if widget_to_remove:
@@ -324,10 +428,14 @@ class Terminal(QWidget):
             self.onTabAddRequested()
 
     def onTabChanged(self, index: int):
-        route_key = self.tabBar.currentTab().routeKey()
+        route_key = self.tabBar.tabItem(index).routeKey()
         target_widget = self.stackedWidget.findChild(PlainTextEdit, route_key)
         if target_widget:
             self.stackedWidget.setCurrentWidget(target_widget)
+            cursor = target_widget.textCursor() # 确保切换后光标在正确位置
+            cursor.movePosition(QTextCursor.End)
+            target_widget.setTextCursor(cursor)
+            target_widget.ensureCursorVisible()
 
     def onTabAddRequested(self):
         current_id = self.next_unique_tab_id
@@ -336,13 +444,35 @@ class Terminal(QWidget):
         new_terminal_edit = PlainTextEdit(self)
         self.addTerminalTab(new_terminal_edit, new_tab_name, new_tab_text, FIF.COMMAND_PROMPT)
         self.next_unique_tab_id += 1
+        # self.tabBar.setCurrentTab(new_tab_name) # 有bug，先不用
 
     def run(self):
         current_widget = self.stackedWidget.currentWidget()
-        if isinstance(current_widget, PlainTextEdit):
-            self._send_command_to_current_terminal(current_widget)
-        else:
-            self.warning('警告', '当前没有激活的终端可以运行命令。')
+        if not isinstance(current_widget, PlainTextEdit):
+            self.warning('警告', '当前没有激活的终端。')
+            return
+        api = self.get_current_api()
+        if not api or api.state() != QProcess.Running:
+            self.warning("警告", "终端进程未运行。请稍后或尝试重新启动。")
+            return
+        terminal_obj_name = api.terminal_object_name
+        current_mode = self.get_terminal_mode(terminal_obj_name)
+        if current_mode != TerminalInputMode.NORMAL:
+            self.warning("警告", "终端未就绪（请先登录）。")
+            return
+        self.requestExplorerRefresh.emit() # 如果终端就绪，发出信号请求 Explorer 刷新
+        self.inform("提示", "已请求资源管理器刷新目录。")
+
+    def inform(self, title, content):
+        InfoBar.info(
+            title=title,
+            content=content,
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self
+        )
 
     def warning(self, title, content):
         InfoBar.warning(

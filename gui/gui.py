@@ -34,9 +34,9 @@ class GUI(FluentWindow):
         self.compiler = None
 
         self.homeInterface       = Home("Home Interface", self)
-        self.explorerInterface   = Explorer('Controller Interface', self)
+        self.terminalInterface  = Terminal('Terminal Interface', self)
+        self.explorerInterface   = Explorer('Explorer Interface', self.terminalInterface, self)
         # self.helperInterface     = Helper('Helper Interface', self)
-        self.workspaceInterface  = Terminal('Terminal Interface', self)
         self.aboutInterface      = About('About Interface', self)
         self.settingInterface    = Setting('Setting Interface', self)
 
@@ -45,8 +45,8 @@ class GUI(FluentWindow):
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, '主页 Home')
-        self.addSubInterface(self.workspaceInterface, FIF.DEVELOPER_TOOLS, '工作区 Work Space')
-        self.addSubInterface(self.explorerInterface, FIF.APPLICATION, '控制台 Control Menu')
+        self.addSubInterface(self.terminalInterface, FIF.DEVELOPER_TOOLS, '终端管理器 Teriminal Manager')
+        self.addSubInterface(self.explorerInterface, FIF.APPLICATION, '资源管理器 File Explorer')
         # self.addSubInterface(self.helperInterface, FIF.BOOK_SHELF, '帮助文档 Helper Document')
 
         self.addSubInterface(self.aboutInterface, FIF.PEOPLE, '关于 About', NavigationItemPosition.BOTTOM)

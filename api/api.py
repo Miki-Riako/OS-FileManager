@@ -99,3 +99,6 @@ class API(QObject):
             self.process.terminate() # 尝试正常终止进程
             if not self.process.waitForFinished(1000): # 等待1秒让进程退出
                 self.process.kill() # 如果未退出，则强制杀死
+
+    def state(self):
+        return self.process.state()

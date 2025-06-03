@@ -1,304 +1,43 @@
-# from typing import List
-
-# from PySide6.QtCore import Qt, Signal, QUrl, QEvent
-# from PySide6.QtGui import QDesktopServices, QPainter, QPen, QColor
-# from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame
-
-# from qfluentwidgets import (ScrollArea, PushButton, FlowLayout, ToolButton, FluentIcon,
-#                             isDarkTheme, IconWidget, Theme, ToolTipFilter, TitleLabel, CaptionLabel,
-#                             SmoothScrollArea, SearchLineEdit, StrongBodyLabel, BodyLabel, toggleTheme)
-
-# from .trie import Trie
-
-# class FileIcon(QFrame):
-#     clicked = Signal(open)
-
-#     def __init__(self, icon: FluentIcon, parent=None):
-#         super().__init__(parent=parent)
-#         self.icon = icon
-#         self.isSelected = False
-
-#         self.iconWidget = IconWidget(icon, self)
-#         self.nameLabel = QLabel(self)
-#         self.vBoxLayout = QVBoxLayout(self)
-
-#         self.setFixedSize(96, 96)
-#         self.vBoxLayout.setSpacing(0)
-#         self.vBoxLayout.setContentsMargins(8, 28, 8, 0)
-#         self.vBoxLayout.setAlignment(Qt.AlignTop)
-#         self.iconWidget.setFixedSize(28, 28)
-#         self.vBoxLayout.addWidget(self.iconWidget, 0, Qt.AlignHCenter)
-#         self.vBoxLayout.addSpacing(14)
-#         self.vBoxLayout.addWidget(self.nameLabel, 0, Qt.AlignHCenter)
-
-#         text = self.nameLabel.fontMetrics().elidedText(icon.value, Qt.ElideRight, 90)
-#         self.nameLabel.setText(text)
-
-#     def mouseReleaseEvent(self, e):
-#         if self.isSelected:
-#             return
-
-#         self.clicked.emit(self.icon)
-
-#     def setSelected(self, isSelected: bool, force=False):
-#         if isSelected == self.isSelected and not force:
-#             return
-
-#         self.isSelected = isSelected
-
-#         if not isSelected:
-#             self.iconWidget.setIcon(self.icon)
-#         else:
-#             icon = self.icon.icon(Theme.LIGHT if isDarkTheme() else Theme.DARK)
-#             self.iconWidget.setIcon(icon)
-
-#         self.setProperty('isSelected', isSelected)
-#         self.setStyle(QApplication.style())
-
-#     def open():
-#         ...
-
-
-# class IconInfoPanel(QFrame):
-#     """ Icon info panel """
-
-#     def __init__(self, icon: FluentIcon, parent=None):
-#         super().__init__(parent=parent)
-#         self.nameLabel = QLabel(icon.value, self)
-#         self.iconWidget = IconWidget(icon, self)
-#         self.iconNameTitleLabel = QLabel(self.tr('Icon name'), self)
-#         self.iconNameLabel = QLabel(icon.value, self)
-#         self.enumNameTitleLabel = QLabel(self.tr('Enum member'), self)
-#         self.enumNameLabel = QLabel("FluentIcon." + icon.name, self)
-
-#         self.vBoxLayout = QVBoxLayout(self)
-#         self.vBoxLayout.setContentsMargins(16, 20, 16, 20)
-#         self.vBoxLayout.setSpacing(0)
-#         self.vBoxLayout.setAlignment(Qt.AlignTop)
-
-#         self.vBoxLayout.addWidget(self.nameLabel)
-#         self.vBoxLayout.addSpacing(16)
-#         self.vBoxLayout.addWidget(self.iconWidget)
-#         self.vBoxLayout.addSpacing(45)
-#         self.vBoxLayout.addWidget(self.iconNameTitleLabel)
-#         self.vBoxLayout.addSpacing(5)
-#         self.vBoxLayout.addWidget(self.iconNameLabel)
-#         self.vBoxLayout.addSpacing(34)
-#         self.vBoxLayout.addWidget(self.enumNameTitleLabel)
-#         self.vBoxLayout.addSpacing(5)
-#         self.vBoxLayout.addWidget(self.enumNameLabel)
-
-#         self.iconWidget.setFixedSize(48, 48)
-#         self.setFixedWidth(216)
-
-#         self.nameLabel.setObjectName('nameLabel')
-#         self.iconNameTitleLabel.setObjectName('subTitleLabel')
-#         self.enumNameTitleLabel.setObjectName('subTitleLabel')
-
-#     def setIcon(self, icon: FluentIcon):
-#         self.iconWidget.setIcon(icon)
-#         self.nameLabel.setText(icon.value)
-#         self.iconNameLabel.setText(icon.value)
-#         self.enumNameLabel.setText("FluentIcon."+icon.name)
-
-
-# class FileView(QWidget):
-#     def __init__(self, parent=None):
-#         super().__init__(parent=parent)
-#         self.trie = Trie()
-#         self.iconLibraryLabel = StrongBodyLabel('File Explorer', self)
-#         self.searchLineEdit = SearchLineEdit(self)
-#         self.searchLineEdit.setPlaceholderText('Search files')
-#         self.searchLineEdit.setFixedWidth(1096)
-#         self.searchLineEdit.textChanged.connect(self.search)
-
-#         self.view = QFrame(self)
-#         self.scrollArea = SmoothScrollArea(self.view)
-#         self.scrollWidget = QWidget(self.scrollArea)
-#         self.infoPanel = IconInfoPanel(FluentIcon.MENU, self)
-
-#         self.vBoxLayout = QVBoxLayout(self)
-#         self.hBoxLayout = QHBoxLayout(self.view)
-#         self.flowLayout = FlowLayout(self.scrollWidget, isTight=True)
-
-#         self.cards = []     # type:List[FileIcon]
-#         self.icons = []
-#         self.currentIndex = -1
-
-#         self.__initWidget()
-
-#     def __initWidget(self):
-#         self.scrollArea.setWidget(self.scrollWidget)
-#         self.scrollArea.setViewportMargins(0, 5, 0, 5)
-#         self.scrollArea.setWidgetResizable(True)
-#         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-#         self.vBoxLayout.setContentsMargins(0, 0, 0, 0)
-#         self.vBoxLayout.setSpacing(12)
-#         self.vBoxLayout.addWidget(self.iconLibraryLabel)
-#         self.vBoxLayout.addWidget(self.searchLineEdit)
-#         self.vBoxLayout.addWidget(self.view)
-
-#         self.hBoxLayout.setSpacing(0)
-#         self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
-#         self.hBoxLayout.addWidget(self.scrollArea)
-#         self.hBoxLayout.addWidget(self.infoPanel, 0, Qt.AlignRight)
-
-#         self.flowLayout.setVerticalSpacing(8)
-#         self.flowLayout.setHorizontalSpacing(8)
-#         self.flowLayout.setContentsMargins(8, 3, 8, 8)
-
-#         self.searchLineEdit.clearSignal.connect(self.showAllIcons)
-#         self.searchLineEdit.searchSignal.connect(self.search)
-
-#         for icon in FluentIcon._member_map_.values():
-#             self.addIcon(icon)
-
-
-#     def addIcon(self, icon: FluentIcon):
-#         card = FileIcon(icon, self)
-#         card.clicked.connect(self.open)
-
-#         self.trie.insert(icon.value, len(self.cards))
-#         self.cards.append(card)
-#         self.icons.append(icon)
-#         self.flowLayout.addWidget(card)
-
-#     def setSelectedIcon(self, icon: FluentIcon):
-#         index = self.icons.index(icon)
-
-#         if self.currentIndex >= 0:
-#             self.cards[self.currentIndex].setSelected(False)
-
-#         self.currentIndex = index
-#         self.cards[index].setSelected(True)
-#         self.infoPanel.setIcon(icon)
-
-#     def search(self, keyWord: str):
-#         items = self.trie.items(keyWord.lower())
-#         indexes = {i[1] for i in items}
-#         self.flowLayout.removeAllWidgets()
-
-#         for i, card in enumerate(self.cards):
-#             isVisible = i in indexes
-#             card.setVisible(isVisible)
-#             if isVisible:
-#                 self.flowLayout.addWidget(card)
-
-#     def showAllIcons(self):
-#         self.flowLayout.removeAllWidgets()
-#         for card in self.cards:
-#             card.show()
-#             self.flowLayout.addWidget(card)
-
-#     def open(self):
-#         ...
-
-
-# class Explorer(QWidget):
-#     def __init__(self, text: str, parent=None):
-#         super().__init__(parent=parent)
-#         self.setupUi()
-#         self.setObjectName(text.replace(' ', '-'))
-#         self.fileView = FileView(self)
-#         self.layout.addWidget(self.fileView)
-
-#     def setupUi(self):
-#         self.layout = QHBoxLayout(self)
-#         self.setLayout(self.layout)
-
 from typing import List
+import re
 import os
-from datetime import datetime
-import stat # 导入stat模块用于文件属性判断
 
-from PySide6.QtCore import Qt, Signal, QUrl, QEvent
+from PySide6.QtCore import Qt, Signal, QUrl, QEvent, QProcess
 from PySide6.QtGui import QDesktopServices, QPainter, QPen, QColor
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame
 
 from qfluentwidgets import (ScrollArea, PushButton, FlowLayout, ToolButton, FluentIcon,
                             isDarkTheme, IconWidget, Theme, ToolTipFilter, TitleLabel, CaptionLabel,
-                            SmoothScrollArea, SearchLineEdit, StrongBodyLabel, BodyLabel, toggleTheme)
+                            SmoothScrollArea, SearchLineEdit, StrongBodyLabel, BodyLabel, toggleTheme,
+                            InfoBar, InfoBarPosition)
 
-from .trie import Trie # 假设trie模块存在，并且支持字符串搜索
+from .trie import Trie
+from .terminal import Terminal, TerminalInputMode
 
-# --- 文件数据模型 ---
 class FileData:
-    """ Represents a file or directory """
-    def __init__(self, path: str):
-        self.path = os.path.abspath(path) # 确保路径是绝对路径
-        self.name = os.path.basename(path)
-        
-        # 默认值
-        self.is_directory = False
-        self.size = 0
-        self.last_modified = None
-        self.fluent_icon = FluentIcon.DOCUMENT # 默认图标：通用文档图标
+    """ Represents a file or directory in the simulated file system """
+    def __init__(self, name: str, logical_path: str, is_directory: bool, uid: str, owner: str, access_string: str, creation_time_str: str, modified_time_str: str):
+        self.name = name
+        self.logical_path = logical_path
+        self.is_directory = is_directory
+        self.uid = uid
+        self.owner = owner
+        self.access_string = access_string
+        self.creation_time_str = creation_time_str
+        self.modified_time_str = modified_time_str
+        self.size = 0 
+        self.fluent_icon = self._determine_fluent_icon()
 
-        # 尝试获取文件信息
-        # 检查os.path.islink，如果是符号链接，尝试解析真实路径
-        if os.path.islink(self.path):
-            try:
-                real_path = os.path.realpath(self.path)
-                if os.path.exists(real_path):
-                    self.path = real_path 
-                    self.name = os.path.basename(real_path) # 更新名称，通常不变
-                else:
-                    self.fluent_icon = FluentIcon.CANCEL # 链接目标不存在
-                    return 
-            except (OSError, PermissionError) as e:
-                self.fluent_icon = FluentIcon.CANCEL # 链接解析失败或无权限
-                return 
-        
-        # 检查文件是否存在，如果不存在，则无法获取信息
-        if not os.path.exists(self.path):
-            self.fluent_icon = FluentIcon.DOCUMENT # 文件不存在，用默认文档图标
-            return 
-
-        try:
-            file_stat = os.stat(self.path)
-            self.is_directory = stat.S_ISDIR(file_stat.st_mode)
-            if not self.is_directory:
-                self.size = file_stat.st_size
-            self.last_modified = datetime.fromtimestamp(file_stat.st_mtime)
-        except (OSError, PermissionError) as e:
-            self.fluent_icon = FluentIcon.CANCEL # 文件存在但无法获取属性
-            return 
-
-        # 根据文件类型或是否为目录选择FluentIcon
+    def _determine_fluent_icon(self):
+        if self.name == "..":
+            return FluentIcon.RETURN # 更换为返回图标
         if self.is_directory:
-            self.fluent_icon = FluentIcon.FOLDER
-        elif self.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg')):
-            self.fluent_icon = FluentIcon.PHOTO
-        elif self.name.lower().endswith(('.txt', '.log', '.md', '.json', '.xml', '.yaml', '.yml', '.csv')):
-            self.fluent_icon = FluentIcon.DOCUMENT
-        elif self.name.lower().endswith(('.py', '.js', '.html', '.css', '.cpp', '.h', '.c', '.java', '.cs', '.go', '.rs', '.sh', '.bat', '.ps1')):
-            self.fluent_icon = FluentIcon.CODE
-        elif self.name.lower().endswith(('.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz')):
-            self.fluent_icon = FluentIcon.ZIP_FOLDER
-        elif self.name.lower().endswith(('.pdf')):
-            self.fluent_icon = FluentIcon.PDF
-        elif self.name.lower().endswith(('.doc', '.docx')):
-            self.fluent_icon = FluentIcon.WORD 
-        elif self.name.lower().endswith(('.xls', '.xlsx')):
-            self.fluent_icon = FluentIcon.EXCEL 
-        elif self.name.lower().endswith(('.ppt', '.pptx')):
-            self.fluent_icon = FluentIcon.POWER_POINT 
-        elif self.name.lower().endswith(('.mp3', '.wav', '.flac', '.ogg', '.aac')):
-            self.fluent_icon = FluentIcon.MUSIC
-        elif self.name.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv')):
-            self.fluent_icon = FluentIcon.VIDEO
-        elif self.name.lower().endswith(('.exe', '.dll', '.msi')):
-            self.fluent_icon = FluentIcon.APPLICATION 
-        elif self.name.lower().endswith(('.lnk')): # Windows快捷方式
-            self.fluent_icon = FluentIcon.LINK 
+            return FluentIcon.FOLDER
         else:
-            self.fluent_icon = FluentIcon.DOCUMENT # 默认文件图标
+            return FluentIcon.DOCUMENT
 
 
 class FileIcon(QFrame):
-    """ File or Folder card """
-
     clicked = Signal(FileData)
     doubleClicked = Signal(FileData)
 
@@ -306,17 +45,13 @@ class FileIcon(QFrame):
         super().__init__(parent=parent)
         self.file_data = file_data
         self.isSelected = False
-
-        try:
+        try: # 确保图标是有效的 FluentIcon 枚举值
             self.iconWidget = IconWidget(file_data.fluent_icon, self)
         except Exception as e:
             print(f"Error creating IconWidget for {file_data.name} (icon: {file_data.fluent_icon}): {e}. Using default error icon.")
-            self.iconWidget = IconWidget(FluentIcon.CANCEL, self)
-
-
+            self.iconWidget = IconWidget(FluentIcon.CANCEL, self) # 使用默认错误图标
         self.nameLabel = QLabel(self)
         self.vBoxLayout = QVBoxLayout(self)
-
         self.setFixedSize(96, 96)
         self.vBoxLayout.setSpacing(0)
         self.vBoxLayout.setContentsMargins(8, 28, 8, 0)
@@ -325,92 +60,102 @@ class FileIcon(QFrame):
         self.vBoxLayout.addWidget(self.iconWidget, 0, Qt.AlignHCenter)
         self.vBoxLayout.addSpacing(14)
         self.vBoxLayout.addWidget(self.nameLabel, 0, Qt.AlignHCenter)
-
         text = self.nameLabel.fontMetrics().elidedText(file_data.name, Qt.ElideRight, 90)
         self.nameLabel.setText(text)
 
     def mouseReleaseEvent(self, e):
-        """ Handles single click """
-        if not self.isSelected:
-            self.clicked.emit(self.file_data)
+        if self.rect().contains(e.pos()): # 只有在鼠标点击位置在文件图标的有效区域内才处理
+            self.clicked.emit(self.file_data) # 即使已经选中，也可以重新点击以确认选择
         super().mouseReleaseEvent(e)
 
     def mouseDoubleClickEvent(self, e):
-        """ Handles double click """
-        self.doubleClicked.emit(self.file_data)
+        if self.rect().contains(e.pos()):
+            self.doubleClicked.emit(self.file_data)
         super().mouseDoubleClickEvent(e)
 
     def setSelected(self, isSelected: bool, force=False):
-        """ Sets the selection state of the card """
         if isSelected == self.isSelected and not force:
             return
-
         self.isSelected = isSelected
-
         if not isSelected:
             self.iconWidget.setIcon(self.file_data.fluent_icon)
-        else:
-            accent_icon = self.file_data.fluent_icon.icon(Theme.LIGHT if isDarkTheme() else Theme.DARK)
-            self.iconWidget.setIcon(accent_icon)
-
+        else: # 在选中状态下，使用强调色图标
+            # FluentIcon.icon() 方法需要 Theme 参数来获取带颜色的图标
+            accent_color = QColor(255, 140, 0) if isDarkTheme() else QColor(0, 120, 212) # 示例强调色
+            self.iconWidget.setIcon(self.file_data.fluent_icon.icon(color=accent_color)) # 确保这里使用 QColor
         self.setProperty('isSelected', isSelected)
         self.setStyle(QApplication.style())
 
 
 class FileInfoPanel(QFrame):
-    """ File or Folder Info panel """
-
     def __init__(self, file_data: FileData = None, parent=None):
         super().__init__(parent=parent)
-        self.nameLabel = QLabel(self)
+        self.nameLabel = StrongBodyLabel(self) # 名字标签更显眼
         self.iconWidget = IconWidget(self)
-        self.pathTitleLabel = QLabel(self.tr('Path'), self)
-        self.pathLabel = QLabel(self)
-        self.typeTitleLabel = QLabel(self.tr('Type'), self)
-        self.typeLabel = QLabel(self)
-        self.sizeTitleLabel = QLabel(self.tr('Size'), self)
-        self.sizeLabel = QLabel(self)
-        self.modifiedTitleLabel = QLabel(self.tr('Last Modified'), self)
-        self.modifiedLabel = QLabel(self)
-
+        self.pathTitleLabel = CaptionLabel('Path', self)
+        self.pathLabel = BodyLabel(self)
+        self.typeTitleLabel = CaptionLabel('Type', self)
+        self.typeLabel = BodyLabel(self)
+        self.sizeTitleLabel = CaptionLabel('Size', self)
+        self.sizeLabel = BodyLabel(self)
+        self.modifiedTitleLabel = CaptionLabel('Last Modified', self)
+        self.modifiedLabel = BodyLabel(self)
+        self.ownerTitleLabel = CaptionLabel('Owner', self)
+        self.ownerLabel = BodyLabel(self)
+        self.accessTitleLabel = CaptionLabel('Access', self)
+        self.accessLabel = BodyLabel(self)
+        self.creationTimeTitleLabel = CaptionLabel('Creation Time', self)
+        self.creationTimeLabel = BodyLabel(self)
         self.vBoxLayout = QVBoxLayout(self)
         self.vBoxLayout.setContentsMargins(16, 20, 16, 20)
         self.vBoxLayout.setSpacing(0)
         self.vBoxLayout.setAlignment(Qt.AlignTop)
-
         self.vBoxLayout.addWidget(self.nameLabel)
         self.vBoxLayout.addSpacing(16)
         self.vBoxLayout.addWidget(self.iconWidget)
         self.vBoxLayout.addSpacing(25)
-
         self.vBoxLayout.addWidget(self.pathTitleLabel)
         self.vBoxLayout.addSpacing(5)
         self.vBoxLayout.addWidget(self.pathLabel)
         self.vBoxLayout.addSpacing(15)
-
         self.vBoxLayout.addWidget(self.typeTitleLabel)
         self.vBoxLayout.addSpacing(5)
         self.vBoxLayout.addWidget(self.typeLabel)
         self.vBoxLayout.addSpacing(15)
-
         self.vBoxLayout.addWidget(self.sizeTitleLabel)
         self.vBoxLayout.addSpacing(5)
         self.vBoxLayout.addWidget(self.sizeLabel)
         self.vBoxLayout.addSpacing(15)
-
+        self.vBoxLayout.addWidget(self.ownerTitleLabel)
+        self.vBoxLayout.addSpacing(5)
+        self.vBoxLayout.addWidget(self.ownerLabel)
+        self.vBoxLayout.addSpacing(15)
+        self.vBoxLayout.addWidget(self.accessTitleLabel)
+        self.vBoxLayout.addSpacing(5)
+        self.vBoxLayout.addWidget(self.accessLabel)
+        self.vBoxLayout.addSpacing(15)
+        self.vBoxLayout.addWidget(self.creationTimeTitleLabel)
+        self.vBoxLayout.addSpacing(5)
+        self.vBoxLayout.addWidget(self.creationTimeLabel)
+        self.vBoxLayout.addSpacing(15)
         self.vBoxLayout.addWidget(self.modifiedTitleLabel)
         self.vBoxLayout.addSpacing(5)
         self.vBoxLayout.addWidget(self.modifiedLabel)
-        self.vBoxLayout.addStretch(1) # 填充剩余空间，让内容靠上
-
+        self.vBoxLayout.addStretch(1)
         self.iconWidget.setFixedSize(48, 48)
         self.setFixedWidth(216)
-
         self.nameLabel.setObjectName('nameLabel')
         self.pathTitleLabel.setObjectName('subTitleLabel')
         self.typeTitleLabel.setObjectName('subTitleLabel')
         self.sizeTitleLabel.setObjectName('subTitleLabel')
         self.modifiedTitleLabel.setObjectName('subTitleLabel')
+        self.ownerTitleLabel.setObjectName('subTitleLabel')
+        self.accessTitleLabel.setObjectName('subTitleLabel')
+        self.creationTimeTitleLabel.setObjectName('subTitleLabel')
+        # 统一设置标签的字体和颜色
+        for label in [self.pathLabel, self.typeLabel, self.sizeLabel, self.modifiedLabel, self.ownerLabel, self.accessLabel, self.creationTimeLabel]:
+            label.setWordWrap(True) # 允许文本换行
+            label.setStyleSheet("color: grey;") # 示例：设置字体颜色为灰色
 
         if file_data:
             self.setFileInfo(file_data)
@@ -418,34 +163,31 @@ class FileInfoPanel(QFrame):
             self.clearFileInfo()
 
     def setFileInfo(self, file_data: FileData):
-        """ Updates the info panel with new file data """
         self.iconWidget.setIcon(file_data.fluent_icon)
         self.nameLabel.setText(file_data.name)
-        self.pathLabel.setText(os.path.normpath(file_data.path))
-        
+        self.pathLabel.setText(file_data.logical_path)
         if file_data.is_directory:
-            self.typeLabel.setText(self.tr("Folder"))
-        elif file_data.fluent_icon == FluentIcon.CANCEL:
-            self.typeLabel.setText(self.tr("Invalid Item"))
-        elif file_data.fluent_icon == FluentIcon.DOCUMENT:
-            self.typeLabel.setText(self.tr("Unknown File Type"))
+            self.typeLabel.setText("Folder")
         else:
-            self.typeLabel.setText(self.tr("File"))
-
-        self.sizeLabel.setText(self._format_size(file_data.size))
-        self.modifiedLabel.setText(file_data.last_modified.strftime("%Y/%m/%d %H:%M") if file_data.last_modified else self.tr("N/A"))
+            self.typeLabel.setText("File")
+        self.sizeLabel.setText(self._format_size(file_data.size)) # size is always 0 for now, as per problem.
+        self.modifiedLabel.setText(file_data.modified_time_str)
+        self.ownerLabel.setText(file_data.owner)
+        self.accessLabel.setText(file_data.access_string)
+        self.creationTimeLabel.setText(file_data.creation_time_str)
 
     def clearFileInfo(self):
-        """ Clears all information in the panel """
         self.iconWidget.setIcon(FluentIcon.INFO)
-        self.nameLabel.setText(self.tr("No item selected"))
+        self.nameLabel.setText("No item selected")
         self.pathLabel.setText("")
         self.typeLabel.setText("")
         self.sizeLabel.setText("")
         self.modifiedLabel.setText("")
+        self.ownerLabel.setText("")
+        self.accessLabel.setText("")
+        self.creationTimeLabel.setText("")
 
     def _format_size(self, size_bytes: int):
-        """ Formats size into human-readable string """
         if size_bytes < 1024:
             return f"{size_bytes} B"
         elif size_bytes < 1024 * 1024:
@@ -457,29 +199,34 @@ class FileInfoPanel(QFrame):
 
 
 class FileView(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, terminal_instance: Terminal, parent=None):
         super().__init__(parent=parent)
+        self.terminal_instance = terminal_instance
         self.trie = Trie()
-        self.current_path = os.path.expanduser('~')
+        self.current_path = "~" # Initial path in Explorer view, matches Shell's initial login path
 
-        # --- 新增：导航按钮和路径标签的布局 ---
+        self._ls_output_regex = re.compile(
+            r"^\s*(?P<fileName>.*?)\s*\|\s*(?P<uid>\d+)\s*\|\s*(?P<owner>.*?)\s*\|\s*(?P<access>[fdrwx\-]+)\s*\|\s*(?P<creation_time>[\d\-\s:]+)\s*\|\s*(?P<modified_time>[\d\-\s:]+)$"
+        )
+        self._prompt_regex = re.compile(r"FileSystem@[\w\.-]+:.*?\$\s")
+
         self.backButton = ToolButton(FluentIcon.RETURN, self)
-        self.backButton.setToolTip(self.tr("Go to parent folder"))
-        self.backButton.setFixedSize(32, 32) # 设置按钮大小
-        self.backButton.clicked.connect(self.go_up_directory) # 连接到返回上一级目录的方法
-        
-        self.pathLabel = BodyLabel(self.tr(f"Current Path: {self.current_path}"), self)
-        self.pathLabel.setContentsMargins(5,0,0,0) # 路径标签左边距，与按钮间隔
+        self.backButton.setToolTip("Go to parent folder")
+        self.backButton.setFixedSize(32, 32)
+        self.backButton.clicked.connect(self.go_up_directory)
+
+        self.pathLabel = BodyLabel(f"Current Path: {self.current_path}", self)
+        self.pathLabel.setContentsMargins(5,0,0,0)
 
         self.navLayout = QHBoxLayout()
         self.navLayout.setContentsMargins(0, 0, 0, 0)
         self.navLayout.setSpacing(5)
         self.navLayout.addWidget(self.backButton)
         self.navLayout.addWidget(self.pathLabel)
-        self.navLayout.addStretch(1) # 确保按钮和路径靠左
+        self.navLayout.addStretch(1)
 
         self.searchLineEdit = SearchLineEdit(self)
-        self.searchLineEdit.setPlaceholderText(self.tr('Search files'))
+        self.searchLineEdit.setPlaceholderText('Search files')
         self.searchLineEdit.setFixedWidth(500)
 
         self.view = QFrame(self)
@@ -491,12 +238,13 @@ class FileView(QWidget):
         self.hBoxLayout = QHBoxLayout(self.view)
         self.flowLayout = FlowLayout(self.scrollWidget, isTight=True)
 
-        self.cards = []     # type:List[FileIcon]
-        self.files_data = [] # type:List[FileData]
+        self.cards = []
+        self.files_data = []
         self.currentIndex = -1
 
-        self.__initWidget()
-        self.load_files(self.current_path)
+        # Connect the signal from Terminal to refresh Explorer
+        self.terminal_instance.explorerCommandOutputReady.connect(self._handle_explorer_command_response)
+        self.__initWidget() # Explorer 启动时为空，等待 Terminal 的 run 按钮触发
 
     def __initWidget(self):
         self.scrollArea.setWidget(self.scrollWidget)
@@ -506,7 +254,7 @@ class FileView(QWidget):
 
         self.vBoxLayout.setContentsMargins(0, 0, 0, 0)
         self.vBoxLayout.setSpacing(12)
-        self.vBoxLayout.addLayout(self.navLayout) # 将新的导航布局添加到主垂直布局
+        self.vBoxLayout.addLayout(self.navLayout)
         self.vBoxLayout.addWidget(self.searchLineEdit)
         self.vBoxLayout.addWidget(self.view)
 
@@ -522,203 +270,271 @@ class FileView(QWidget):
         self.searchLineEdit.clearSignal.connect(self.showAllFiles)
         self.searchLineEdit.searchSignal.connect(self.search)
 
-        self.__setQss()
+        self.clear_file_display() # 初始化时清空显示，确保它最初是空的
 
-    def __setQss(self):
-        self.view.setObjectName('fileView')
-        self.scrollWidget.setObjectName('scrollWidget')
-        if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
-            self.cards[self.currentIndex].setSelected(True, True)
+    def _show_infobar(self, title, content, type_info: InfoBarPosition):
+        InfoBar.info(
+            title=title,
+            content=content,
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=type_info,
+            duration=3000,
+            parent=self
+        )
 
-    def load_files(self, path: str):
-        """ Loads files and directories from the given path """
-        self.flowLayout.removeAllWidgets()
-        for card in self.cards:
-            card.deleteLater()
+    def clear_file_display(self):
+        """ 清空文件显示区，包括卡片、数据和信息面板 """
+        while self.flowLayout.count(): # 移除 FlowLayout 中的所有 widget
+            item = self.flowLayout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater() # 延迟删除 widget
+
         self.cards.clear()
         self.files_data.clear()
         self.currentIndex = -1
         self.infoPanel.clearFileInfo()
-        self.trie = Trie()
+        self.trie = Trie() # 重置 Trie
+        self.pathLabel.setText("Current Path: (Empty)") # 显示为空状态
 
-        try:
-            if not os.path.exists(path):
-                print(f"Error: Path does not exist: {path}")
-                self.pathLabel.setText(self.tr(f"Error: Path does not exist - {path}"))
-                self.backButton.setVisible(False) # 路径错误时隐藏返回按钮
-                return
-            if not os.path.isdir(path):
-                print(f"Error: Path is not a directory: {path}")
-                parent_dir = os.path.dirname(path)
-                if parent_dir and parent_dir != path:
-                    self.load_files(parent_dir)
-                else:
-                    self.pathLabel.setText(self.tr(f"Error: Path is not a directory - {path}"))
-                    self.backButton.setVisible(False)
-                return
-
-            self.current_path = os.path.abspath(path)
-            self.pathLabel.setText(self.tr(f"Current Path: {self.current_path}"))
-
-            # 控制返回按钮的可见性
-            parent_dir = os.path.dirname(self.current_path)
-            if parent_dir and parent_dir != self.current_path:
-                self.backButton.setVisible(True)
-                # 添加“..”的 FileData，它依然需要出现在列表中作为可点击的返回项
-                if os.path.exists(parent_dir):
-                    try:
-                        parent_file_data = FileData(parent_dir)
-                        if parent_file_data.fluent_icon != FluentIcon.CANCEL:
-                            parent_file_data.name = ".."
-                            parent_file_data.fluent_icon = FluentIcon.FOLDER_OPEN
-                            self.addFile(parent_file_data, is_parent_dir=True)
-                    except Exception as e_parent:
-                        print(f"Warning: Failed to create FileData for parent directory {parent_dir}: {e_parent}")
-            else:
-                self.backButton.setVisible(False)
-
-
-            items_in_dir = []
-            try:
-                for item_name in os.listdir(self.current_path):
-                    item_path = os.path.join(self.current_path, item_name)
-                    
-                    excluded_names = {
-                        'application data', 'local settings', 'my documents', 'nethood', 'printhood', 
-                        'recent', 'sendto', 'start menu', 'templates', 'cookies', 'tracing', 
-                        'localservice', 'networkservice', 'default user', 'all users', 
-                        'system volume information', '$recycle.bin', 'programdata', 'documents and settings'
-                    }
-                    if item_name.lower() in excluded_names:
-                        continue
-                    if item_name.lower().startswith(tuple(['ntuser.'])) or item_name.startswith('.'): # 组合判断
-                        continue
-
-                    if os.path.islink(item_path):
-                        if not os.path.exists(os.path.realpath(item_path)):
-                            continue
-                    
-                    items_in_dir.append(item_path)
-
-            except PermissionError:
-                print(f"Permission denied to list directory contents: {self.current_path}")
-                self.pathLabel.setText(self.tr(f"Error: Permission denied to list contents - {self.current_path}"))
-                self.backButton.setVisible(True) # 即使无法列出，也可能需要返回
-                return
-            except Exception as list_e:
-                print(f"Error listing directory contents {self.current_path}: {list_e}")
-                self.pathLabel.setText(self.tr(f"Error listing contents: {list_e}"))
-                self.backButton.setVisible(True)
-                return
-
-            items_in_dir.sort(key=lambda x: (not os.path.isdir(x), os.path.basename(x).lower()))
-
-            for item_path in items_in_dir:
-                try:
-                    file_data = FileData(item_path)
-                    if file_data.fluent_icon != FluentIcon.CANCEL:
-                        self.addFile(file_data)
-                except Exception as file_e:
-                    print(f"Warning: Critical error creating FileData for {item_path}: {file_e}")
-
-            if self.files_data:
-                first_selectable_data = None
-                for fd in self.files_data:
-                    if fd.name != ".." and fd.fluent_icon != FluentIcon.CANCEL:
-                        first_selectable_data = fd
-                        break
-                
-                if first_selectable_data:
-                    self.setSelectedFile(first_selectable_data)
-                else:
-                    self.infoPanel.clearFileInfo()
-            else:
-                self.infoPanel.clearFileInfo()
-
-        except PermissionError:
-            print(f"Permission denied to access directory: {path}")
-            self.pathLabel.setText(self.tr(f"Error: Permission denied - {path}"))
-            self.infoPanel.clearFileInfo()
-            self.backButton.setVisible(True)
-        except Exception as e:
-            print(f"Failed to load directory {path}: {e}")
-            self.pathLabel.setText(self.tr(f"Error loading path: {e}"))
-            self.infoPanel.clearFileInfo()
-            self.backButton.setVisible(True)
-
-
-    def addFile(self, file_data: FileData, is_parent_dir=False):
-        """ Adds a file/folder card to the view """
-        if file_data.fluent_icon == FluentIcon.CANCEL:
+    def load_current_terminal_directory(self):
+        """Public slot: 由 Terminal 的 Run 按钮触发，加载当前 Terminal 的目录。"""
+        current_api = self.terminal_instance.get_current_api()
+        if not current_api or current_api.state() != QProcess.Running:
+            self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
+            self.pathLabel.setText("Error: No active terminal.")
+            self.clear_file_display() # 清空显示
             return
 
+        terminal_obj_name = current_api.terminal_object_name
+        current_terminal_mode = self.terminal_instance.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
+            self.pathLabel.setText("Please login in Terminal Manager first.")
+            self.clear_file_display() # 清空显示
+            return
+        # 如果没有未完成的 Explorer 命令，并且终端处于 NORMAL 模式，则发送 ls -a
+        if self.terminal_instance._explorer_current_api_obj_name is None:
+            self.pathLabel.setText(f"Loading: {self.current_path}...") # 显示加载中
+            self.terminal_instance.execute_command_for_explorer("ls -a") # 直接发送 ls -a，因为我们假设 Shell 的当前目录就是我们要显示的
+        else:
+            self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
+
+
+    def _handle_explorer_command_response(self, terminal_obj_name: str, raw_output: str, success: bool, error_msg: str):
+        if self.terminal_instance._explorer_current_api_obj_name != terminal_obj_name: # 确认这是当前 Explorer 正在使用的终端实例的响应
+            print(f"[Explorer] Ignoring output from {terminal_obj_name} as it's not the active Explorer API.")
+            return
+
+        if not success:
+            self._show_infobar("命令失败", f"执行命令失败：{error_msg}", InfoBarPosition.TOP)
+            self.pathLabel.setText(f"Error: {error_msg}")
+            self.clear_file_display() # 出错时清空显示
+            return
+
+        match = self._prompt_regex.search(raw_output) # 获取命令执行后的真实当前路径
+        if match: # 提取路径部分
+            prompt_full = match.group(0).strip()
+            path_start_index = prompt_full.find(":") + 1
+            path_end_index = prompt_full.find("$")
+            if path_start_index != -1 and path_end_index != -1 and path_start_index < path_end_index:
+                extracted_path = prompt_full[path_start_index:path_end_index].strip()
+                # 规范化路径，例如 "~/path" 或 "/path"
+                if extracted_path == "": # 如果是根目录，可能解析为""
+                    self.current_path = "~"
+                else:
+                    self.current_path = extracted_path.replace('//', '/') # 消除双斜杠
+        # ls -a 的输出包含了表头，可以通过这个来判断
+        # 即使是 cd 命令的响应，最终也会触发 ls -a 的输出，所以这里统一处理 ls -a 的解析
+        # 只有 ls -a 命令的原始输出才包含表头和文件列表
+        # 如果 raw_output 仅包含 cd 命令的提示符，_parse_ls_output_and_populate_cards 会自行判断并清空显示
+        self._parse_ls_output_and_populate_cards(raw_output)
+        self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
+
+
+    def _parse_ls_output_and_populate_cards(self, raw_output: str):
+        """解析 ls -a 的原始输出，创建 FileData 对象，并填充 UI。"""
+        self.clear_file_display() # 清空旧数据
+        lines = raw_output.strip().split('\n')
+        data_lines = []
+        is_data_section = False
+
+        for line_num, line in enumerate(lines):
+            stripped_line = line.strip()
+            # 改进 Header 检测：使用正则表达式来更精确地匹配表头行
+            # 表头行通常以 "  fileName   | uid |" 这样的形式开始
+            # 我们可以用一个正则表达式来匹配表头模式，而不是简单的 startsWith
+            if re.search(r"^\s*fileName\s*\|\s*uid\s*\|", stripped_line) and not is_data_section:
+                print(f"[DEBUG_EXPLORER] Detected header line at line {line_num}: '{stripped_line}'")
+                is_data_section = True
+                continue # 跳过表头行
+            # 检测到提示符且在数据段内，表示数据段结束
+            if is_data_section and self._prompt_regex.search(stripped_line):
+                print(f"[DEBUG_EXPLORER] Detected prompt at line {line_num}, ending data section: '{stripped_line}'")
+                is_data_section = False
+                break # 退出循环，不再处理后续行
+            # 如果在数据段内且行不为空，则添加到 data_lines
+            if is_data_section and stripped_line:
+                data_lines.append(stripped_line)
+                # print(f"[DEBUG_EXPLORER] Added data line: '{stripped_line}'") # 可以打开此行进行详细调试
+
+        parsed_data = []
+        for line_num, line in enumerate(data_lines):
+            match = self._ls_output_regex.match(line)
+            if match:
+                data = match.groupdict()
+                # Apply .strip() to all captured groups to remove whitespace
+                name = data['fileName'].strip()
+                uid = data['uid'].strip()
+                owner = data['owner'].strip()
+                access_string = data['access'].strip()
+                creation_time_str = data['creation_time'].strip()
+                modified_time_str = data['modified_time'].strip()
+
+                is_dir = access_string.startswith('d')
+                # 为每个条目构建逻辑路径 (当前路径 + 文件名)
+                item_logical_path = ""
+                if name == ".":
+                    item_logical_path = self.current_path
+                elif name == "..":
+                    # Calculate parent path
+                    parts = self.current_path.split('/')
+                    if parts and parts[-1] == '': # Handle trailing slash for root or empty path parts
+                        parts = parts[:-1]
+                    if not parts or (len(parts) == 1 and (parts[0] == '~' or parts[0] == '/')):
+                        item_logical_path = '~' # Already at root, parent is still root (represented by ~)
+                    else:
+                        temp_path = '/'.join(parts[:-1])
+                        if temp_path == '': # e.g., from "/dir" to "/", new_path becomes empty. Set to "/"
+                            item_logical_path = '/'
+                        else:
+                            item_logical_path = temp_path
+                    # Standardize '/' and '~' representations for root paths
+                    if item_logical_path == '/':
+                        # Preserve original root indicator if it was '~'
+                        if self.current_path.startswith('~'):
+                            item_logical_path = '~'
+                    elif item_logical_path == '': # Should not happen if above logic is good, but as a fallback
+                        item_logical_path = '~'
+                else: # Regular file/folder
+                    if self.current_path == "~":
+                        item_logical_path = f"~/{name}"
+                    elif self.current_path == "/":
+                        item_logical_path = f"/{name}"
+                    else:
+                        item_logical_path = f"{self.current_path}/{name}"
+                item_logical_path = item_logical_path.replace('//', '/') # Normalize path again (e.g. `//` to `/`)
+
+                try:
+                    file_data = FileData(
+                        name=name,
+                        logical_path=item_logical_path,
+                        is_directory=is_dir,
+                        uid=uid,
+                        owner=owner,
+                        access_string=access_string,
+                        creation_time_str=creation_time_str,
+                        modified_time_str=modified_time_str
+                    )
+                    if file_data.name != ".": # Exclude the current directory entry
+                        parsed_data.append(file_data)
+                except Exception as e:
+                    print(f"[Explorer] Error creating FileData from line '{line}' (line_num {line_num}): {e}")
+        parsed_data.sort(key=lambda x: (not x.is_directory, x.name.lower()))
+
+        for file_data in parsed_data:
+            self.addFile(file_data)
+        if self.files_data:
+            self.setSelectedFile(self.files_data[0])
+        else:
+            self.infoPanel.clearFileInfo()
+
+        self.pathLabel.setText(f"Current Path: {self.current_path}")
+
+    def load_files(self, logical_path: str):
+        """
+        内部方法：用于导航，发送 cd 命令到目标路径，然后触发 ls -a。
+        这个方法不应直接检查 Terminal 登录状态，而是假定调用者（例如 load_current_terminal_directory 或 handleDoubleClick）已经检查过。
+        """
+        if self.terminal_instance._explorer_current_api_obj_name is not None:
+             self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
+             return
+        self.pathLabel.setText(f"Loading: {logical_path}...")
+
+        normalized_logical_path = logical_path.replace('//', '/')
+        if normalized_logical_path == "": # Empty path usually means user home
+            normalized_logical_path = "~"
+        if normalized_logical_path != self.current_path:
+            cd_command = f"cd {normalized_logical_path}"
+            self.terminal_instance.execute_command_for_explorer(cd_command)
+        else:
+            self.terminal_instance.execute_command_for_explorer("ls -a")
+
+    def addFile(self, file_data: FileData):
         try:
             card = FileIcon(file_data, self)
             card.clicked.connect(self.setSelectedFile)
             card.doubleClicked.connect(self.handleDoubleClick)
 
-            if not is_parent_dir:
-                self.trie.insert(file_data.name.lower(), len(self.cards))
+            self.trie.insert(file_data.name.lower(), len(self.cards)) # Store name in lowercase for case-insensitive search
             self.cards.append(card)
             self.files_data.append(file_data)
             self.flowLayout.addWidget(card)
         except Exception as e:
-            print(f"Error adding file card for {file_data.path}: {e}")
-
+            print(f"Error adding file card for {file_data.logical_path}: {e}")
 
     def setSelectedFile(self, file_data: FileData):
-        """ Sets the selected file/folder and updates info panel """
-        if file_data.fluent_icon == FluentIcon.CANCEL:
-            if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
-                self.cards[self.currentIndex].setSelected(False)
-            self.currentIndex = -1
-            self.infoPanel.clearFileInfo()
-            return
-            
         try:
             index = -1
             for i, fd in enumerate(self.files_data):
-                if fd is file_data:
+                if fd is file_data: # Use identity for comparison as FileData objects are unique instances here
                     index = i
                     break
-            
             if index == -1:
+                if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
+                    self.cards[self.currentIndex].setSelected(False)
                 self.currentIndex = -1
                 self.infoPanel.clearFileInfo()
                 return
 
             if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
-                self.cards[self.currentIndex].setSelected(False)
+                # Deselect previous card if it exists and is different from current
+                if self.currentIndex != index:
+                    self.cards[self.currentIndex].setSelected(False)
 
             self.currentIndex = index
             self.cards[index].setSelected(True)
             self.infoPanel.setFileInfo(file_data)
         except Exception as e:
-            print(f"Error in setSelectedFile for {file_data.path}: {e}")
+            print(f"Error in setSelectedFile for {file_data.logical_path}: {e}")
             self.currentIndex = -1
             self.infoPanel.clearFileInfo()
 
 
     def handleDoubleClick(self, file_data: FileData):
-        """ Handles double click event on a file/folder card """
-        if file_data.fluent_icon == FluentIcon.CANCEL:
+        current_api = self.terminal_instance.get_current_api()
+        if not current_api or current_api.state() != QProcess.Running:
+            self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
+            return
+
+        terminal_obj_name = current_api.terminal_object_name
+        current_terminal_mode = self.terminal_instance.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
             return
 
         if file_data.is_directory:
             self.searchLineEdit.clear()
-            self.load_files(file_data.path)
+            self.load_files(file_data.logical_path) # 调用内部的 load_files
         else:
-            self.openFile(file_data.path)
+            self._show_infobar("提示", f"双击文件 '{file_data.name}' 功能暂未实现。", InfoBarPosition.TOP)
+
 
     def openFile(self, file_path: str):
-        """ Placeholder for opening a file """
-        try:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-        except Exception as e:
-            print(f"Failed to open file {file_path}: {e}")
+        pass
 
     def search(self, keyWord: str):
-        """ Searches for files/folders by name """
         if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
             self.cards[self.currentIndex].setSelected(False)
             self.currentIndex = -1
@@ -726,17 +542,8 @@ class FileView(QWidget):
 
         self.flowLayout.removeAllWidgets()
 
-        # 如果有“..”，先加回来
-        if self.files_data and self.files_data[0].name == "..":
-            self.flowLayout.addWidget(self.cards[0])
-
         if not keyWord:
-            for i, card in enumerate(self.cards):
-                if card.file_data.name == "..":
-                    continue
-                if card.file_data.fluent_icon != FluentIcon.CANCEL:
-                    card.setVisible(True)
-                    self.flowLayout.addWidget(card)
+            self.showAllFiles()
             return
 
         items_indices = self.trie.items(keyWord.lower())
@@ -744,18 +551,12 @@ class FileView(QWidget):
 
         for i in range(len(self.cards)):
             card = self.cards[i]
-            if card.file_data.name == "..":
-                card.setVisible(True)
-                self.flowLayout.addWidget(card)
-                continue
-
-            isVisible = (i in indexes) and (card.file_data.fluent_icon != FluentIcon.CANCEL)
+            isVisible = (i in indexes)
             card.setVisible(isVisible)
             if isVisible:
                 self.flowLayout.addWidget(card)
 
     def showAllFiles(self):
-        """ Shows all files and folders in the current directory """
         if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
             self.cards[self.currentIndex].setSelected(False)
             self.currentIndex = -1
@@ -763,27 +564,48 @@ class FileView(QWidget):
 
         self.flowLayout.removeAllWidgets()
         for card in self.cards:
-            if card.file_data.fluent_icon != FluentIcon.CANCEL:
-                card.show()
-                self.flowLayout.addWidget(card)
+            card.show()
+            self.flowLayout.addWidget(card)
 
     def go_up_directory(self):
-        """ Navigates to the parent directory """
-        parent_path = os.path.dirname(self.current_path)
-        # 只有当当前目录不是根目录时才允许返回
-        if parent_path and parent_path != self.current_path and os.path.exists(parent_path) and os.path.isdir(parent_path):
-            self.load_files(parent_path)
-        else:
-            print(f"Already at root or cannot access parent: {self.current_path}")
+        current_api = self.terminal_instance.get_current_api()
+        if not current_api or current_api.state() != QProcess.Running:
+            self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
+            return
+
+        terminal_obj_name = current_api.terminal_object_name
+        current_terminal_mode = self.terminal_instance.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
+            return
+        # Check if already at root based on common shell representations
+        if self.current_path == "~" or self.current_path == "/":
+            self._show_infobar("提示", "已在根目录。", InfoBarPosition.TOP)
+            return
+        parts = self.current_path.split('/')
+        # Remove empty string if path ends with / (e.g., "/dir/")
+        if parts and parts[-1] == '':
+            parts = parts[:-1]
+
+        new_path = ""
+        if len(parts) > 1: # If more than one part (e.g., "~/dir" or "/dir/subdir")
+            new_path = '/'.join(parts[:-1])
+            if new_path == '': # If moving from "/dir" to "/", new_path becomes empty. Set to "/"
+                new_path = '/'
+        else: # Current path is "~" or "/" or a single segment like "dir"
+            new_path = "~" # Default to user home root if no parent or single segment.
+            # If current_path was "/", then new_path becomes "~", which is a valid transition in this system.
+        self.load_files(new_path)
 
 
 class Explorer(QWidget):
-    def __init__(self, text: str, parent=None):
+    def __init__(self, text: str, terminal_instance: Terminal, parent=None):
         super().__init__(parent=parent)
         self.setupUi()
         self.setObjectName(text.replace(' ', '-'))
-        self.fileView = FileView(self)
+        self.fileView = FileView(terminal_instance, self)
         self.layout.addWidget(self.fileView)
+        terminal_instance.requestExplorerRefresh.connect(self.fileView.load_current_terminal_directory)
 
     def setupUi(self):
         self.layout = QHBoxLayout(self)
