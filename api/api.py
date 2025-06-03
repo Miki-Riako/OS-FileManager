@@ -3,6 +3,8 @@ import sys
 
 from PySide6.QtCore import QObject, Signal, QProcess, Qt
 
+DEBUG = True
+
 class API(QObject):
     standardOutputReady = Signal(str, str)
     standardErrorReady = Signal(str, str)
@@ -29,8 +31,7 @@ class API(QObject):
     def _get_executable_path(self, executable_name):
         """在目录下查找可执行文件的完整路径。"""
         root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        executable_dir = os.path.join(root_dir, "build")
-        # executable_dir = os.path.join(root_dir, "bin")
+        executable_dir = os.path.join(root_dir, "build") if DEBUG else os.path.join(root_dir, "bin")
 
         if sys.platform == 'win32' and not executable_name.lower().endswith(('.py', '.bat', '.cmd', '.exe')):
             executable_name += ".exe"

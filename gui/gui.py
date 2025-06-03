@@ -33,12 +33,12 @@ class GUI(FluentWindow):
 
         self.compiler = None
 
-        self.homeInterface       = Home("Home Interface", self)
-        self.terminalInterface  = Terminal('Terminal Interface', self)
-        self.explorerInterface   = Explorer('Explorer Interface', self.terminalInterface, self)
-        # self.helperInterface     = Helper('Helper Interface', self)
-        self.aboutInterface      = About('About Interface', self)
-        self.settingInterface    = Setting('Setting Interface', self)
+        self.homeInterface     = Home("Home Interface", self)
+        self.terminalInterface = Terminal('Terminal Interface', self)
+        self.explorerInterface = Explorer('Explorer Interface', self.terminalInterface, self)
+        # self.helperInterface   = Helper('Helper Interface', self)
+        self.aboutInterface    = About('About Interface', self)
+        self.settingInterface  = Setting('Setting Interface', self)
 
         self.initNavigation()
         self.splashScreen.finish()

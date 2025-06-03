@@ -60,11 +60,11 @@ class Terminal(QWidget):
         self.main_shell_prompt_regex = re.compile(r"FileSystem@[\w\.-]+:.*?\$\s")
 
         self.__initWidget()
-        self.runButton.clicked.connect(self.run)
         self.setObjectName(text.replace(' ', '-'))
 
     def __initWidget(self):
         self.__initLayout()
+        self.__initButton()
         self.tabBar.currentChanged.connect(self.onTabChanged)
         self.tabBar.tabAddRequested.connect(self.onTabAddRequested)
         self.tabBar.tabCloseRequested.connect(self.onTabCloseRequested)
@@ -79,6 +79,9 @@ class Terminal(QWidget):
         self.vBoxLayout.addLayout(self.tabBoxLayout)
         self.vBoxLayout.addWidget(self.stackedWidget)
         self.vBoxLayout.setContentsMargins(5, 5, 5, 5)
+
+    def __initButton(self):
+        self.runButton.clicked.connect(self.run)
 
     def _get_terminal_widget_by_object_name(self, object_name: str) -> PlainTextEdit:
         """根据 objectName 获取对应的 PlainTextEdit 实例。"""
