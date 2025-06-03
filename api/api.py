@@ -11,6 +11,7 @@ class API(QObject):
 
     def __init__(self, terminal_object_name: str, executable_filename: str, parent=None):
         super().__init__(parent)
+        self.parent_gui = parent
         self.terminal_object_name = terminal_object_name
         self.executable_filename = executable_filename # 存储要启动的 app 的文件名
         self.process = QProcess(self) # QProcess 的父对象是 API 自身，方便管理
@@ -37,7 +38,7 @@ class API(QObject):
         full_path = os.path.join(executable_dir, executable_name)
 
         if not os.path.exists(full_path): # 不在这里直接显示 warning，而是返回 None，让调用者处理
-            print(f"[API._get_executable_path] Error: Executable not found at '{full_path}'")
+            self.parent_gui.warning("Executable not found", f"[API._get_executable_path] Error: Executable not found at '{full_path}'")
             return None
         return full_path
 

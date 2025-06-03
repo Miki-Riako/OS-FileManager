@@ -22,6 +22,12 @@ from api.api import API
 
 from .highlighter import Highlighter
 
+class TerminalInputMode:
+    NORMAL = "NORMAL" # 普通命令输入模式
+    LOGIN_USERNAME = "LOGIN_USERNAME" # 登录：等待用户名
+    LOGIN_PASSWORD = "LOGIN_PASSWORD" # 登录：等待密码
+    SUDO_PASSWORD = "SUDO_PASSWORD" # Sudo：等待密码
+
 class Workspace(QWidget):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
@@ -38,6 +44,13 @@ class Workspace(QWidget):
         self.next_unique_tab_id = 0
         self.terminal_apis = {}
         self.input_start_indices = {}
+        self.terminal_modes = {}
+        self.password_buffers = {}
+
+        self.login_username_prompt_regex = re.compile(r"host@login:Username\$ ")
+        self.login_password_prompt_regex = re.compile(r"host@login:Password\$ ")
+        self.sudo_password_prompt_regex = re.compile(r"\[sudo\] password for .*?:\s")
+        self.main_shell_prompt_regex = re.compile(r"FileSystem@[\w\.-]+:.*?\$\s")
 
         self.__initWidget()
         self.runButton.clicked.connect(self.run)
@@ -58,26 +71,48 @@ class Workspace(QWidget):
         text_edit.setTextCursor(cursor)
         text_edit.ensureCursorVisible()
 
+    def _determine_terminal_state(self, full_text: str) -> tuple[TerminalInputMode, int]:
+        """根据终端的完整文本内容，确定当前的输入模式和用户输入的起始索引。"""
+        potential_prompts = []
+        prompt_patterns = [ # 定义所有可能的提示符正则表达式和它们对应的模式
+            (self.login_username_prompt_regex, TerminalInputMode.LOGIN_USERNAME),
+            (self.login_password_prompt_regex, TerminalInputMode.LOGIN_PASSWORD),
+            (self.sudo_password_prompt_regex, TerminalInputMode.SUDO_PASSWORD),
+            (self.main_shell_prompt_regex, TerminalInputMode.NORMAL)
+        ]
+        for regex, mode in prompt_patterns: # 遍历所有提示符类型，找到它们在 full_text 中最后一次出现的位置
+            match = None
+            for m in regex.finditer(full_text): # 使用 finditer 找到所有匹配，并取最后一个（最靠后的）
+                match = m
+            if match:
+                potential_prompts.append((match.end(), mode))
+
+        potential_prompts.sort(key=lambda x: x[0]) # 根据匹配的结束位置进行排序，最新的提示符在列表末尾
+        new_mode = TerminalInputMode.NORMAL # 默认模式和输入位置：如果没有识别到特定提示符，则默认为普通模式，输入位置在文本末尾
+        new_input_start_index = len(full_text)
+
+        if potential_prompts:
+            latest_match_end_pos, latest_mode = potential_prompts[-1] # 取列表中最后一个（即位置最靠后，最新的）提示符来决定当前模式和输入起始位置
+            new_mode = latest_mode
+            new_input_start_index = latest_match_end_pos
+
+        return new_mode, new_input_start_index
+
     def _handle_api_output(self, terminal_object_name: str, output: str, is_error: bool = False):
         """处理来自 API 的标准输出信号。"""
         text_edit = self._get_terminal_widget_by_object_name(terminal_object_name)
         if not text_edit:
             return
         if '\x0c' in output:
-            text_edit.clear()
+            # text_edit.clear()
             output = output.replace('\x0c', '') # 移除换页符，防止它干扰后续文本显示和高亮
-            self.input_start_indices[terminal_object_name] = 0 # 由于清空了，光标起始位置可以暂时设为0，后续的提示符会更新它
 
         self._append_to_terminal(text_edit, output, is_error)
-        full_text = text_edit.document().toPlainText() # 在追加内容后，尝试识别并设置新的输入起始位置
-        general_prompt_regex = r"([\w\.-]+@[\w\.-]+:.*?\$\s)" 
-        last_prompt_match = None
-        for match in re.finditer(general_prompt_regex, full_text):
-            last_prompt_match = match # 使用 finditer 遍历所有匹配，以确保找到最后一个提示符
-        if last_prompt_match: # 提示符的结束位置就是用户可以开始输入的位置
-            self.input_start_indices[terminal_object_name] = last_prompt_match.end()
-        else:
-            self.input_start_indices[terminal_object_name] = len(full_text)
+        full_text = text_edit.document().toPlainText()
+
+        self.terminal_modes[terminal_object_name],\
+        self.input_start_indices[terminal_object_name]\
+            = self._determine_terminal_state(full_text)
 
         cursor = text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
@@ -111,34 +146,46 @@ class Workspace(QWidget):
         """从 PlainTextEdit 中获取用户输入的命令，并通过 API 发送给对应的 Shell。"""
         object_name = text_edit.objectName() # 获取当前终端的输入起始位置
         input_start_index = self.input_start_indices.get(object_name)
+        current_mode = self.terminal_modes.get(object_name, TerminalInputMode.NORMAL)
         if input_start_index is None:
             self._append_to_terminal(text_edit, "\n错误：未初始化输入位置，无法发送命令。\n", is_error=True)
             return
-        full_text = text_edit.toPlainText()
+
         cursor = text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
         text_edit.setTextCursor(cursor)
-        input_data = full_text[input_start_index:].strip()
+        full_text = text_edit.toPlainText()
 
-        if input_data.strip().lower() == "clear":
-            text_edit.clear() # 清空 PlainTextEdit
-            self.input_start_indices[object_name] = 0 # 清空后，输入起始位置回到 0，API 会重新发送提示符
-            terminal_api = self.terminal_apis.get(object_name)
-            if terminal_api:
-                terminal_api.send_input_to_app(input_data)
-            return # 阻止后续的 input_data + '\n' 追加，因为它已经被清空了
+        input_data = ""
+        if current_mode in [TerminalInputMode.LOGIN_PASSWORD, TerminalInputMode.SUDO_PASSWORD]:
+            input_data = self.password_buffers.get(object_name, "") # 在密码模式下，从内部缓冲区获取数据
+            self.password_buffers[object_name] = "" # 清空内部缓冲区，因为密码已发送
+        else:
+            input_data = full_text[input_start_index:].strip() # 普通命令模式下，从 PlainTextEdit 获取数据
 
-        cursor.setPosition(input_start_index) # 将用户输入的命令显示为历史记录的一部分，然后删除用户输入和旧的提示符 从 input_start_index 到文本末尾
+        terminal_api = self.terminal_apis.get(object_name)
+        if not terminal_api:
+            self._append_to_terminal(text_edit, "错误：未找到终端 API 实例。\n", is_error=True)
+            self.input_start_indices[object_name] = len(text_edit.document().toPlainText())
+            cursor.movePosition(QTextCursor.End); text_edit.setTextCursor(cursor)
+            return
+
+        if input_data.strip().lower() == "clear" and current_mode == TerminalInputMode.NORMAL:
+            text_edit.clear()
+            self.input_start_indices[object_name] = 0
+            terminal_api.send_input_to_app(input_data)
+            return
+
+        cursor.setPosition(input_start_index)
         cursor.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
         cursor.removeSelectedText()
         text_edit.setTextCursor(cursor)
-        text_edit.insertPlainText(input_data + '\n') # 重新插入用户输入的命令，后面跟一个换行符，模拟用户按Enter
-        terminal_api = self.terminal_apis.get(object_name)
-        if terminal_api:
-            terminal_api.send_input_to_app(input_data)
+
+        if current_mode == TerminalInputMode.NORMAL:
+            text_edit.insertPlainText(input_data + '\n') # 重新插入用户输入的命令，后面跟一个换行符，模拟用户按Enter
         else:
-            self._append_to_terminal(text_edit, "错误：未找到终端 API 实例。\n", is_error=True)
-            self.input_start_indices[object_name] = len(text_edit.document().toPlainText()) # 如果没有 API 实例，保持提示符可见，光标在末尾
+            text_edit.insertPlainText('\n')
+        terminal_api.send_input_to_app(input_data)
 
         cursor = text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
@@ -171,50 +218,67 @@ class Workspace(QWidget):
 
     def eventFilter(self, watched_object, event):
         if isinstance(watched_object, PlainTextEdit) and watched_object is self.stackedWidget.currentWidget():
+            text_edit = watched_object
+            object_name = text_edit.objectName()
+            input_start_index = self.input_start_indices.get(object_name, 0)
+            current_cursor = text_edit.textCursor()
+            current_mode = self.terminal_modes.get(object_name, TerminalInputMode.NORMAL)
+            is_password_or_sudo_mode = (current_mode in [TerminalInputMode.LOGIN_PASSWORD, TerminalInputMode.SUDO_PASSWORD])
+
             if event.type() == QEvent.Type.KeyPress:
                 key = event.key()
-                text_edit = watched_object
-                current_cursor = text_edit.textCursor()
-                object_name = text_edit.objectName()
-                input_start_index = self.input_start_indices.get(object_name, 0) # 获取当前终端的输入起始位置，如果不存在，默认是0（允许从头开始输入）
-                if key == Qt.Key.Key_Backspace: # 阻止 Backspace 键删除提示符
-                    if current_cursor.hasSelection(): # 如果有选中文字，且选中范围的开始位置在提示符之前，则阻止
-                        if current_cursor.selectionStart() < input_start_index:
-                            return True # 消费事件，阻止删除
-                    elif current_cursor.position() <= input_start_index: # 如果没有选中文字，且光标在提示符或提示符之前，则阻止
-                        return True # 消费事件，阻止删除
-                elif key == Qt.Key.Key_Delete: # 阻止 Delete 键删除提示符 (Delete是向前删除)
-                    if current_cursor.hasSelection(): # 如果有选中文字，且选中范围的开始位置在提示符之前，则阻止
-                        if current_cursor.selectionStart() < input_start_index:
-                            return True # 消费事件，阻止删除
-                    elif current_cursor.position() < input_start_index: # 如果没有选中文字，且光标在提示符之前，则阻止 (在提示符处按Delete删除用户输入是允许的)
-                        return True # 消费事件，阻止删除
-                if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter: # 处理 Enter 键 (保持不变)
-                    if event.modifiers() & Qt.KeyboardModifier.ShiftModifier: # 同时按下了 Shift 键默认换行
-                        return super().eventFilter(watched_object, event)
-                    else: # 普通 Enter 键，触发命令发送
+                key_text = event.text() # 获取按下的字符
+                if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter: # 处理 Enter 键 (优先级最高)
+                    if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                        return super().eventFilter(watched_object, event) # Shift+Enter 依然是换行，即使在密码模式下，不过通常密码不需要多行输入
+                    else:
                         self._send_command_to_current_terminal(watched_object)
-                        return True # 消费这个事件，阻止 PlainTextEdit 默认的换行
-            elif event.type() == QEvent.Type.MouseButtonPress: # 阻止鼠标点击/拖动光标到提示符之前
+                        return True # 消费事件
+                if key == Qt.Key.Key_Backspace: # 处理 Backspace 和 Delete 键阻止删除提示符之前的内容，无论是否在密码模式
+                    if current_cursor.hasSelection():
+                        if current_cursor.selectionStart() < input_start_index:
+                            return True # 阻止删除
+                    elif current_cursor.position() <= input_start_index: # 如果光标在提示符边界或之前
+                        return True # 阻止删除
+                    if is_password_or_sudo_mode: # 密码模式下，处理内部缓冲区
+                        password_buffer = self.password_buffers.get(object_name, "")
+                        if password_buffer: # 如果缓冲区不为空，则删除最后一个字符
+                            self.password_buffers[object_name] = password_buffer[:-1]
+                        return True # 消费事件，阻止 PlainTextEdit 默认处理
+                elif key == Qt.Key.Key_Delete:
+                    if current_cursor.hasSelection():
+                        if current_cursor.selectionStart() < input_start_index:
+                            return True # 阻止删除
+                    elif current_cursor.position() < input_start_index:
+                        return True # 阻止删除
+                    if is_password_or_sudo_mode:
+                        pass # 为了简单且符合常见终端行为，对于密码输入，通常忽略 Delete 键。
+                if is_password_or_sudo_mode: # 处理密码输入模式下的字符显示 (什么都不显示)
+                    if current_cursor.position() < input_start_index: # 如果光标不在用户输入区域，先强制移到正确位置
+                        current_cursor.setPosition(input_start_index)
+                        text_edit.setTextCursor(current_cursor)
+                    if key_text and key_text.isprintable(): # 对于所有可打印字符，添加到内部缓冲区，但不显示在 PlainTextEdit 上
+                        password_buffer = self.password_buffers.get(object_name, "") # 获取当前密码缓冲区，如果不存在则初始化
+                        self.password_buffers[object_name] = password_buffer + key_text
+                        text_edit.textCursor().movePosition(QTextCursor.EndOfLine) # 确保光标仍然在正确位置，但不要插入任何字符
+                        return True # 消费事件，阻止 PlainTextEdit 默认处理 (即显示字符)
+                return super().eventFilter(watched_object, event) # 如果不是密码模式，或不是特殊处理的键，则允许 PlainTextEdit 正常处理
+            elif event.type() == QEvent.Type.MouseButtonPress: #  阻止鼠标点击/拖动光标到提示符之前
                 text_edit = watched_object
                 object_name = text_edit.objectName()
                 input_start_index = self.input_start_indices.get(object_name, 0)
-                cursor_at_click = text_edit.cursorForPosition(event.position().toPoint()) # 获取鼠标点击位置对应的文本光标位置
-                if cursor_at_click.position() < input_start_index: # 如果点击位置在提示符之前，则强制将光标设置到提示符开始处
+                cursor_at_click = text_edit.cursorForPosition(event.position().toPoint())
+                if cursor_at_click.position() < input_start_index:
                     QTimer.singleShot(0, lambda: text_edit.textCursor().setPosition(input_start_index))
-                    # 延时设置光标，以确保在 QPlainTextEdit 自己的事件处理之后发生
-                    # 不阻止事件，让QPlainTextEdit处理鼠标点击，然后我们再调整光标
-                    # return True # 如果返回True，则完全阻止QPlainTextEdit的鼠标点击处理
-
         return super().eventFilter(watched_object, event)
 
     def addTerminalTab(self, widget: PlainTextEdit, objectName, text, icon):
         widget.setObjectName(objectName)
         widget.setFont(QFont(self.font_family, self.font_size))
         widget.setPlaceholderText("Command prompt...")
-        cursor = widget.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        widget.setTextCursor(cursor)
+
+        self.terminal_modes[objectName] = TerminalInputMode.NORMAL
+        self.password_buffers[objectName] = "" # 初始化密码缓冲区为空字符串
 
         cursor = widget.textCursor()
         cursor.movePosition(QTextCursor.End)
@@ -228,7 +292,7 @@ class Workspace(QWidget):
             text=text,
             icon=icon
         )
-        self.tabBar.setCurrentTab(objectName)
+        # self.tabBar.setCurrentTab(objectName) # !!!不知道为什么有未知的bug会导致切换时文本不变但进程改变，暂时不切换，让用户手动切换
 
         terminal_api = API(objectName, "app", self)
         self.terminal_apis[objectName] = terminal_api # 存储起来
@@ -237,7 +301,7 @@ class Workspace(QWidget):
         terminal_api.processFinished.connect(self._handle_api_finished)
         terminal_api.processErrorOccurred.connect(self._handle_api_error_occurred)
         if not terminal_api.start_app_process():
-            pass # 如果失败，API 发出 processErrorOccurred 信号，这里可不再重复
+            pass
 
     def onTabCloseRequested(self, index: int):
         tab_item = self.tabBar.tabItem(index)
@@ -248,7 +312,6 @@ class Workspace(QWidget):
             terminal_api.terminate_app_process() # 告诉 API 终止其管理的 Shell 进程
             del self.terminal_apis[route_key] # 从字典中移除引用
             terminal_api.deleteLater() # 销毁 API 对象
-
 
         widget_to_remove = self.stackedWidget.findChild(PlainTextEdit, route_key)
         if widget_to_remove:
