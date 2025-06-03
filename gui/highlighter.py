@@ -7,7 +7,9 @@ SHELL_COMMANDS = [
     'python', 'pip', 'node', 'npm', 'gcc', 'make', 'ssh', 'scp', 'ping',
     'ifconfig', 'ip', 'netstat', 'ps', 'kill', 'bg', 'fg', 'jobs', 'exit',
     'clear', 'history', 'export', 'unset', 'alias', 'unalias', 'source',
-    'chmod', 'chown', 'tar', 'zip', 'unzip', 'wget', 'curl', 'htop', 'top'
+    'chmod', 'chown', 'tar', 'zip', 'unzip', 'wget', 'curl', 'htop', 'top',
+
+    'logout', 'format', 'useradd', 'userdel', 'userlist', 'passwd', 'trust', 'distrust', 'vim'
 ]
 
 class Highlighter(QSyntaxHighlighter):
@@ -17,11 +19,22 @@ class Highlighter(QSyntaxHighlighter):
         self.highlighting_rules = []
 
         # 提示符 (Prompt)
-        prompt_format = QTextCharFormat()
-        prompt_format.setForeground(QColor("#50fa7b")) # 明亮的绿色 (Dracula theme-like)
-        prompt_format.setFontWeight(QFont.Bold)
-        prompt_pattern = r"^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[^$]*\$\s"
-        self.highlighting_rules.append((re.compile(prompt_pattern), prompt_format))
+        self.prompt_user_host_color = QColor("#50fa7b")  # 亮绿色 (Dracula theme-like)
+        self.prompt_path_color = QColor("#8be9fd")       # 青蓝色 (Dracula theme-like)
+        self.prompt_user_host_format = QTextCharFormat()
+        self.prompt_user_host_format.setForeground(self.prompt_user_host_color)
+        self.prompt_user_host_format.setFontWeight(QFont.Bold)
+
+        self.prompt_path_format = QTextCharFormat()
+        self.prompt_path_format.setForeground(self.prompt_path_color)
+        # self.prompt_path_format.setFontWeight(QFont.Bold) # 路径通常不加粗，可根据喜好决定
+
+        self.prompt_regex = re.compile(
+            r"^(?P<user_host>[\w\.-]+@[\w\.-]+)"  # user@host
+            r"(?P<colon>:)"                      # :
+            r"(?P<path>.*?)"                     # path part (non-greedy)
+            r"(?P<dollar_space>\$\s)"            # $
+        )
 
         # 注释 (Comments)
         comment_format = QTextCharFormat()
@@ -60,31 +73,24 @@ class Highlighter(QSyntaxHighlighter):
 
         # Shell Variables (e.g., $VAR, ${VAR_NAME})
         variable_format = QTextCharFormat()
-        variable_format.setForeground(QColor("#50fa7b")) # Same as prompt, or choose another green
+        variable_format.setForeground(QColor("#50fa7b"))
         variable_format.setFontItalic(True)
         self.highlighting_rules.append((re.compile(r"\$[a-zA-Z_]\w*|\$\{[^}]+\}"), variable_format))
 
     def highlightBlock(self, text: str):
-        # 提示符规则通常是第一个
-        prompt_rule = self.highlighting_rules[0]
-        prompt_pattern_compiled, prompt_fmt = prompt_rule
- 
-        prompt_end_offset = 0
-        # 尝试匹配行首的提示符 使用 re.match 因为提示符必须在行首
-        prompt_match = prompt_pattern_compiled.match(text)
+        prompt_match = self.prompt_regex.match(text)
+        prompt_end_offset = 0 # 默认没有提示符
         if prompt_match:
-            start, end = prompt_match.span()
-            self.setFormat(start, end - start, prompt_fmt)
-            prompt_end_offset = end # 记录提示符的结束位置
-
-        # 处理其他规则，但只在提示符之后的部分
+            start = prompt_match.start('user_host') # 应用绿色到 user@host 部分
+            end = prompt_match.end('user_host')
+            self.setFormat(start, end - start, self.prompt_user_host_format)
+            start = prompt_match.start('path') # 应用蓝色到路径部分
+            end = prompt_match.end('path')
+            self.setFormat(start, end - start, self.prompt_path_format)
+            prompt_end_offset = prompt_match.end() # 整个提示符的结束位置，用于后续规则的起始点
         for pattern, char_format in self.highlighting_rules:
-            # 跳过提示符规则，因为它已经处理过了
-            if pattern == prompt_pattern_compiled:
-                continue
-
             for match in pattern.finditer(text):
                 start, end = match.span()
-                # 确保匹配项不在提示符内部 (如果提示符本身可能包含关键词) 并且确保匹配项在提示符之后开始，或者根本没有提示符
+                # 确保匹配项在提示符的结束位置之后才应用高亮
                 if start >= prompt_end_offset:
                     self.setFormat(start, end - start, char_format)
