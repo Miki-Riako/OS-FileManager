@@ -28,7 +28,7 @@ class TerminalInputMode:
     LOGIN_PASSWORD = "LOGIN_PASSWORD" # 登录：等待密码
     SUDO_PASSWORD = "SUDO_PASSWORD" # Sudo：等待密码
 
-class Workspace(QWidget):
+class Terminal(QWidget):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         # self.api = API(self, "app")
@@ -342,15 +342,7 @@ class Workspace(QWidget):
         if isinstance(current_widget, PlainTextEdit):
             self._send_command_to_current_terminal(current_widget)
         else:
-            InfoBar.warning(
-                title='警告',
-                content="没有激活的终端可以运行命令。",
-                orient=Qt.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=2000,
-                parent=self
-            )
+            self.warning('警告', '当前没有激活的终端可以运行命令。')
 
     def warning(self, title, content):
         InfoBar.warning(

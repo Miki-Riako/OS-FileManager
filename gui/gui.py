@@ -10,7 +10,11 @@ from qfluentwidgets import setTheme, SplashScreen
 from qfluentwidgets import Theme
 from qfluentwidgets import FluentIcon as FIF
 
-from .terminal import Workspace
+from .home import Home
+from .terminal import Terminal
+from .explorer import Explorer
+from .about import About
+from .setting import Setting
 
 class Widget(QFrame):
     def __init__(self, text: str, parent=None):
@@ -29,24 +33,24 @@ class GUI(FluentWindow):
 
         self.compiler = None
 
-        # self.homeInterface       = Home("Home Interface", self)
-        # self.controllerInterface = Controller('Controller Interface', self)
+        self.homeInterface       = Home("Home Interface", self)
+        self.explorerInterface   = Explorer('Controller Interface', self)
         # self.helperInterface     = Helper('Helper Interface', self)
-        self.workspaceInterface  = Workspace('Workspace Interface', self)
-        # self.aboutInterface      = About('About Interface', self)
-        # self.settingInterface    = Setting('Setting Interface', self)
+        self.workspaceInterface  = Terminal('Terminal Interface', self)
+        self.aboutInterface      = About('About Interface', self)
+        self.settingInterface    = Setting('Setting Interface', self)
 
         self.initNavigation()
         self.splashScreen.finish()
 
     def initNavigation(self):
-        # self.addSubInterface(self.homeInterface, FIF.HOME, '主页 Home')
+        self.addSubInterface(self.homeInterface, FIF.HOME, '主页 Home')
         self.addSubInterface(self.workspaceInterface, FIF.DEVELOPER_TOOLS, '工作区 Work Space')
-        # self.addSubInterface(self.controllerInterface, FIF.APPLICATION, '控制台 Control Menu')
+        self.addSubInterface(self.explorerInterface, FIF.APPLICATION, '控制台 Control Menu')
         # self.addSubInterface(self.helperInterface, FIF.BOOK_SHELF, '帮助文档 Helper Document')
 
-        # self.addSubInterface(self.aboutInterface, FIF.PEOPLE, '关于 About', NavigationItemPosition.BOTTOM)
-        # self.addSubInterface(self.settingInterface, FIF.SETTING, '设置 Settings', NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.aboutInterface, FIF.PEOPLE, '关于 About', NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.settingInterface, FIF.SETTING, '设置 Settings', NavigationItemPosition.BOTTOM)
 
     def initWindow(self):
         setTheme(Theme.DARK)
