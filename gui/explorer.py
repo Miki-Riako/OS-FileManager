@@ -31,7 +31,6 @@ class FileData:
         self.access = access # This is the full access string, e.g., 'drwxrwxrwx' or 'frwxrw-r--'
         self.creation_time = creation_time
         self.modified_time = modified_time
-        self.size = 0 # Size is always 0 for now as per requirement.
 
 class FileIcon(QFrame):
     clicked = Signal(FileData)
@@ -44,7 +43,7 @@ class FileIcon(QFrame):
 
         # Determine icon and if it's a directory based on access string
         self.fluent_icon, self.is_directory_ui = FileIcon._determine_icon_and_type(file_data.name, file_data.access)
-        
+
         try:
             self.iconWidget = IconWidget(self.fluent_icon, self)
         except Exception as e:
@@ -69,10 +68,10 @@ class FileIcon(QFrame):
         """ Determines the FluentIcon and if it's a directory based on name and access string. """
         if name == "..":
             return FluentIcon.RETURN, True # ".." is always treated as a directory for navigation
-        
+
         is_directory = access_string.startswith('d')
         is_file = access_string.startswith('-') or access_string.startswith('f') # 'f' is treated as file for now based on output
-        
+
         if is_directory:
             return FluentIcon.FOLDER, True
         elif is_file:
@@ -115,8 +114,6 @@ class FileInfoPanel(QFrame):
         self.pathLabel = BodyLabel(self)
         self.typeTitleLabel = CaptionLabel('Type', self)
         self.typeLabel = BodyLabel(self)
-        self.sizeTitleLabel = CaptionLabel('Size', self)
-        self.sizeLabel = BodyLabel(self)
         self.modifiedTitleLabel = CaptionLabel('Last Modified', self)
         self.modifiedLabel = BodyLabel(self)
         self.ownerTitleLabel = CaptionLabel('Owner', self)
@@ -126,9 +123,32 @@ class FileInfoPanel(QFrame):
         self.creationTimeTitleLabel = CaptionLabel('Creation Time', self)
         self.creationTimeLabel = BodyLabel(self)
         self.vBoxLayout = QVBoxLayout(self)
+        self.__initWidget()
+        self.nameLabel.setObjectName('nameLabel')
+        self.pathTitleLabel.setObjectName('subTitleLabel')
+        self.typeTitleLabel.setObjectName('subTitleLabel')
+        self.modifiedTitleLabel.setObjectName('subTitleLabel')
+        self.ownerTitleLabel.setObjectName('subTitleLabel')
+        self.accessTitleLabel.setObjectName('subTitleLabel')
+        self.creationTimeTitleLabel.setObjectName('subTitleLabel')
+        for label in [self.pathLabel, self.typeLabel, self.modifiedLabel, self.ownerLabel, self.accessLabel, self.creationTimeLabel]:
+            label.setWordWrap(True)
+            label.setStyleSheet("color: grey;")
+
+        if file_data:
+            self.setFileInfo(file_data, "") # Initial call, path will be set later
+        else:
+            self.clearFileInfo()
+
+    def __initWidget(self):
+        self.__initLayout()
         self.vBoxLayout.setContentsMargins(16, 20, 16, 20)
         self.vBoxLayout.setSpacing(0)
         self.vBoxLayout.setAlignment(Qt.AlignTop)
+        self.iconWidget.setFixedSize(48, 48)
+        self.setFixedWidth(216)
+
+    def __initLayout(self):
         self.vBoxLayout.addWidget(self.nameLabel)
         self.vBoxLayout.addSpacing(16)
         self.vBoxLayout.addWidget(self.iconWidget)
@@ -140,10 +160,6 @@ class FileInfoPanel(QFrame):
         self.vBoxLayout.addWidget(self.typeTitleLabel)
         self.vBoxLayout.addSpacing(5)
         self.vBoxLayout.addWidget(self.typeLabel)
-        self.vBoxLayout.addSpacing(15)
-        self.vBoxLayout.addWidget(self.sizeTitleLabel)
-        self.vBoxLayout.addSpacing(5)
-        self.vBoxLayout.addWidget(self.sizeLabel)
         self.vBoxLayout.addSpacing(15)
         self.vBoxLayout.addWidget(self.ownerTitleLabel)
         self.vBoxLayout.addSpacing(5)
@@ -161,24 +177,6 @@ class FileInfoPanel(QFrame):
         self.vBoxLayout.addSpacing(5)
         self.vBoxLayout.addWidget(self.modifiedLabel)
         self.vBoxLayout.addStretch(1)
-        self.iconWidget.setFixedSize(48, 48)
-        self.setFixedWidth(216)
-        self.nameLabel.setObjectName('nameLabel')
-        self.pathTitleLabel.setObjectName('subTitleLabel')
-        self.typeTitleLabel.setObjectName('subTitleLabel')
-        self.sizeTitleLabel.setObjectName('subTitleLabel')
-        self.modifiedTitleLabel.setObjectName('subTitleLabel')
-        self.ownerTitleLabel.setObjectName('subTitleLabel')
-        self.accessTitleLabel.setObjectName('subTitleLabel')
-        self.creationTimeTitleLabel.setObjectName('subTitleLabel')
-        for label in [self.pathLabel, self.typeLabel, self.sizeLabel, self.modifiedLabel, self.ownerLabel, self.accessLabel, self.creationTimeLabel]:
-            label.setWordWrap(True)
-            label.setStyleSheet("color: grey;")
-
-        if file_data:
-            self.setFileInfo(file_data, "") # Initial call, path will be set later
-        else:
-            self.clearFileInfo()
 
     def setFileInfo(self, file_data: FileData, current_explorer_path: str):
         # Determine icon and type for display
@@ -191,7 +189,6 @@ class FileInfoPanel(QFrame):
         self.pathLabel.setText(logical_path_to_display)
         
         self.typeLabel.setText("Folder" if is_directory else "File")
-        self.sizeLabel.setText(self._format_size(file_data.size))
         self.modifiedLabel.setText(file_data.modified_time)
         self.ownerLabel.setText(file_data.owner)
         self.accessLabel.setText(file_data.access)
@@ -202,22 +199,10 @@ class FileInfoPanel(QFrame):
         self.nameLabel.setText("No item selected")
         self.pathLabel.setText("")
         self.typeLabel.setText("")
-        self.sizeLabel.setText("")
         self.modifiedLabel.setText("")
         self.ownerLabel.setText("")
         self.accessLabel.setText("")
         self.creationTimeLabel.setText("")
-
-    def _format_size(self, size_bytes: int):
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.2f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.2f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-
 
 class Explorer(QWidget):
     def __init__(self, text: str, terminal_manager: Terminal, parent=None):
@@ -230,7 +215,6 @@ class Explorer(QWidget):
         self.trie = Trie()
         self.current_path = "~" # Initial path in Explorer view, matches Shell's initial login path
 
-        # !!! IMPORTANT FIX: Allow 'f' in access string pattern !!!
         self._ls_output_regex = re.compile(
             r"^\s*(?P<fileName>.*?)\s*\|\s*(?P<uid>\d+)\s*\|\s*(?P<owner>.*?)\s*\|\s*(?P<access>[fdrwx\-]+)\s*\|\s*(?P<creation_time>[\d\-\s:]+)\s*\|\s*(?P<modified_time>[\d\-\s:]+)$"
         )
@@ -316,12 +300,10 @@ class Explorer(QWidget):
 
     def clear_file_display(self):
         """ Clears the file display area, including cards, data, and info panel """
-        while self.flowLayout.count():
-            item = self.flowLayout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
-
+        while self.flowLayout.count() > 0:
+            item_to_remove = self.flowLayout.takeAt(0)
+            if item_to_remove is not None: # Ensure the returned item is not None
+                item_to_remove.deleteLater() # Directly delete the QWidget (FileIcon)
         self.cards.clear()
         self.files_data.clear()
         self.currentIndex = -1
@@ -412,32 +394,16 @@ class Explorer(QWidget):
         data_lines = []
         is_data_section = False
 
-        print(f"[DEBUG_EXPLORER] --- Parsing raw_output for display ---")
-        print(f"[DEBUG_EXPLORER] Raw output length: {len(raw_output)}")
-        print(f"[DEBUG_EXPLORER] Total lines after split: {len(lines)}")
-
         for line_num, line in enumerate(lines):
             stripped_line = line.strip()
             if re.search(r"^\s*fileName\s*\|\s*uid\s*\|", stripped_line) and not is_data_section:
-                print(f"[DEBUG_EXPLORER] Detected header line at line {line_num}: '{stripped_line}'")
                 is_data_section = True
                 continue
             if is_data_section and self._prompt_regex.search(stripped_line):
-                print(f"[DEBUG_EXPLORER] Detected prompt at line {line_num}, ending data section: '{stripped_line}'")
                 is_data_section = False
                 break
             if is_data_section and stripped_line:
                 data_lines.append(stripped_line)
-        
-        # After loop, if a prompt was at the very end of raw_output, data_lines might still contain it
-        # This is fine as the regex match will handle it, but can lead to warnings.
-        # Let's ensure data_lines only contains actual data by checking for prompt *not* at beginning
-        # The prompt detection in the loop above is more robust, but double check.
-        # No, the prompt match is handled by `self._prompt_regex.search(stripped_line)`, so it will break before adding prompt line to `data_lines`.
-
-
-        print(f"[DEBUG_EXPLORER] Data lines extracted for parsing: {len(data_lines)}")
-        
         parsed_data = []
         for line_num, line in enumerate(data_lines):
             match = self._ls_output_regex.match(line)
@@ -452,17 +418,11 @@ class Explorer(QWidget):
                     creation_time=data['creation_time'].strip(),
                     modified_time=data['modified_time'].strip()
                 )
-                
                 if file_data.name == ".": # Exclude the current directory entry from display, it's redundant
                     continue 
 
                 parsed_data.append(file_data)
-                print(f"[DEBUG_EXPLORER] Parsed item: Name='{file_data.name}', Access='{file_data.access}'")
-            else:
-                print(f"[Explorer] Warning: Could not parse line from ls -a output: '{line}' (line_num {line_num}) - No regex match.")
 
-        print(f"[DEBUG_EXPLORER] Total FileData objects created: {len(parsed_data)}")
-        
         # Sort directories before files, then alphabetically
         def sort_key(file_data: FileData):
             # Check if it's a directory using FileIcon's logic for consistency
@@ -478,16 +438,10 @@ class Explorer(QWidget):
             self.setSelectedFile(self.files_data[0])
         else:
             self.infoPanel.clearFileInfo()
-            print("[DEBUG_EXPLORER] No files to display or select.")
 
         self.pathLabel.setText(f"Current Path: {self.current_path}")
 
     def load_files(self, logical_path: str):
-        """
-        Internal method: Used for navigation, sends 'cd' command to target path, then triggers 'ls -a'.
-        This method assumes the caller (e.g., load_current_terminal_directory or handleDoubleClick) has already checked
-        the Terminal login status.
-        """
         if self.terminal_manager._explorer_current_api_obj_name is not None:
              self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
              return
@@ -616,11 +570,11 @@ class Explorer(QWidget):
         if current_terminal_mode != TerminalInputMode.NORMAL:
             self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
             return
-        
+
         if self.current_path == "~" or self.current_path == "/":
             self._show_infobar("提示", "已在根目录。", InfoBarPosition.TOP)
             return
-        
+
         # Use the helper to determine the parent path
         new_path = Explorer._get_item_logical_path(self.current_path, "..")
         self.load_files(new_path)
