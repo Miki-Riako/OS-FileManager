@@ -241,10 +241,10 @@ void Shell::cmd_cd() {
         std::cout << "cd: too much arguments" << std::endl;
         return;
     }
-
     if (cmd.size() == 1) {
         return;
     }
+
     if (!cmd[1].empty() && cmd[1][0] == '~') {
         cmd[1] = cmd[1].substr(1);
     }
@@ -265,8 +265,7 @@ void Shell::cmd_cd() {
         } else {
             if (userInterface.cd(user.uid, item, cmd[1]).first) {
                 curPath.push_back(item);
-            }
-            else {
+            } else {
                 break;
             }
         }
@@ -285,8 +284,7 @@ void Shell::cmd_ls() {
     else if (cmd.size() == 2) {
         if (cmd[1] == "-l") {
             userInterface.ls(user.uid, true, std::string());
-        }
-        else {
+        } else {
             std::vector<std::string> src = split_path(cmd[1]);
             if (src.empty()) {
                 std::cout << "ls: missing operand" << std::endl;
@@ -294,8 +292,7 @@ void Shell::cmd_ls() {
             }
             userInterface.ls(user.uid, false, src, cmd[1]);
         }
-    }
-    else {
+    } else {
         if (cmd[1] == "-l") {
             std::vector<std::string> src = split_path(cmd[2]);
             if (src.empty()) {
@@ -303,16 +300,14 @@ void Shell::cmd_ls() {
                 return;
             }
             userInterface.ls(user.uid, true, src, cmd[2]);
-        }
-        else if (cmd[2] == "-l") {
+        } else if (cmd[2] == "-l") {
             std::vector<std::string> src = split_path(cmd[1]);
             if (src.empty()) {
                 std::cout << "ls: missing operand" << std::endl;
                 return;
             }
             userInterface.ls(user.uid, true, src, cmd[1]);
-        }
-        else {
+        } else {
             std::cout << "ls: too much arguments" << std::endl;
         }
     }
@@ -339,8 +334,11 @@ void Shell::cmd_touch() {
         return;
     }
     src.pop_back();
-    if (!src.empty()) userInterface.touch(user.uid, src, fileName, cmd[1]);
-    else userInterface.touch(user.uid, fileName, cmd[1]);
+    if (!src.empty()) {
+        userInterface.touch(user.uid, src, fileName, cmd[1]);
+    } else {
+        userInterface.touch(user.uid, fileName, cmd[1]);
+    }
 }
 
 void Shell::cmd_cat() {
@@ -427,8 +425,11 @@ void Shell::cmd_rm() {
     }
     std::string fileName = src.back();
     src.pop_back();
-    if (!src.empty()) userInterface.rm(user.uid, src, fileName, cmd[1]);
-    else userInterface.rm(user.uid, fileName, cmd[1]);
+    if (!src.empty()) {
+        userInterface.rm(user.uid, src, fileName, cmd[1]);
+    } else {
+        userInterface.rm(user.uid, fileName, cmd[1]);
+    }
 }
 
 void Shell::cmd_mkdir() {
@@ -452,8 +453,11 @@ void Shell::cmd_mkdir() {
         return;
     }
     src.pop_back();
-    if (!src.empty()) userInterface.mkdir(user.uid, src, dirName, cmd[1]);
-    else userInterface.mkdir(user.uid, dirName, cmd[1]);
+    if (!src.empty()) {
+        userInterface.mkdir(user.uid, src, dirName, cmd[1]);
+    } else {
+        userInterface.mkdir(user.uid, dirName, cmd[1]);
+    }
 }
 
 void Shell::cmd_rmdir() {
@@ -473,8 +477,11 @@ void Shell::cmd_rmdir() {
     }
     std::string dirName = src.back();
     src.pop_back();
-    if (!src.empty()) userInterface.rmdir(user.uid, src, dirName, cmd[1]);
-    else userInterface.rmdir(user.uid, dirName, cmd[1]);
+    if (!src.empty()) {
+        userInterface.rmdir(user.uid, src, dirName, cmd[1]);
+    } else {
+        userInterface.rmdir(user.uid, dirName, cmd[1]);
+    }
 }
 
 bool Shell::cmd_sudo() {
@@ -552,8 +559,11 @@ void Shell::cmd_chmod() {
 
     std::string dirName = src.back();
     src.pop_back();
-    if (!src.empty()) userInterface.chmod(user.uid, src, dirName, cmd[2], access, cmd[1]);
-    else userInterface.chmod(user.uid, dirName, cmd[2], access, cmd[1]);
+    if (!src.empty()) {
+        userInterface.chmod(user.uid, src, dirName, cmd[2], access, cmd[1]);
+    } else {
+        userInterface.chmod(user.uid, dirName, cmd[2], access, cmd[1]);
+    }
 }
 
 void Shell::cmd_mkuser() {
@@ -639,16 +649,16 @@ void Shell::cmd_help() {
     }
 
     if (cmd.size() == 1) { //单独执行help，表示输出所有命令
-        std::cout << "Usage                         Interpret" << std::endl;
+        std::cout << "Usage                            Interpret" << std::endl;
+        std::cout << "__________________________________________" << std::endl;
         for (auto [_, inform] : help) {
             std::cout << inform << std::endl;
         }
-    }
-    else if (help.count(cmd[1])) {
-        std::cout << "Usage                         Interpret" << std::endl;
+    } else if (help.count(cmd[1])) {
+        std::cout << "Usage                            Interpret" << std::endl;
+        std::cout << "__________________________________________" << std::endl;
         std::cout << help[cmd[1]] << std::endl;
-    }
-    else {
+    } else {
         std::cout << "help: " << cmd[1] << ": command not found" << std::endl;
     }
 }
@@ -683,7 +693,7 @@ void Shell::cmd_vim() {
 }
 
 void Shell::outputPrefix() {
-    std::cout << "OSFileManagerSystem@" << user.name << ":" << "~";
+    std::cout << "OSFileSystem@" << user.name << ":" << "~";
     for (const auto& s : curPath) {
         std::cout << "/" << s;
     }

@@ -220,7 +220,7 @@ class Explorer(QWidget):
         self._ls_output_regex = re.compile(
             r"^\s*(?P<fileName>.*?)\s*\|\s*(?P<uid>\d+)\s*\|\s*(?P<owner>.*?)\s*\|\s*(?P<access>[fdrwx\-]+)\s*\|\s*(?P<creation_time>[\d\-\s:]+)\s*\|\s*(?P<modified_time>[\d\-\s:]+)$"
         )
-        self._prompt_regex = re.compile(r"OSFileManagerSystem@[\w\.-]+:.*?\$\s")
+        self._prompt_regex = re.compile(r"OSFileSystem@[\w\.-]+:.*?\$\s")
 
         self.backButton = ToolButton(FluentIcon.RETURN, self)
         self.pathLabel = StrongBodyLabel(f"Current Path: {self.current_path}", self)
