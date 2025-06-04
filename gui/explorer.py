@@ -62,6 +62,7 @@ class FileIcon(QFrame):
         self.vBoxLayout.addWidget(self.nameLabel, 0, Qt.AlignHCenter)
         text = self.nameLabel.fontMetrics().elidedText(file_data.name, Qt.ElideRight, 90)
         self.nameLabel.setText(text)
+        self.setObjectName('FileIconCard') # Set object name for styling if needed
 
     @staticmethod
     def _determine_icon_and_type(name: str, access_string: str):
@@ -83,8 +84,7 @@ class FileIcon(QFrame):
 
 
     def mouseReleaseEvent(self, e):
-        if self.rect().contains(e.pos()):
-            self.clicked.emit(self.file_data)
+        self.clicked.emit(self.file_data)
         super().mouseReleaseEvent(e)
 
     def mouseDoubleClickEvent(self, e):
@@ -104,7 +104,7 @@ class FileIcon(QFrame):
                 accent_color = QColor(100, 180, 255) # Example: lighter blue for dark theme
             self.iconWidget.setIcon(self.fluent_icon.icon(color=accent_color))
         self.setProperty('isSelected', isSelected)
-        self.setStyle(QApplication.style())
+        self.setStyle(QApplication.style()) # Apply stylesheet to update visual state
 
 
 class FileInfoPanel(QFrame):
@@ -228,13 +228,13 @@ class Explorer(QWidget):
         self.searchLineEdit = SearchLineEdit(self)
         self.view = QFrame(self)
         self.scrollArea = SmoothScrollArea(self.view)
-        self.scrollWidget = QWidget(self.scrollArea)
+        self.scrollWidget = QWidget(self.scrollArea) # This widget will contain the FlowLayout
         self.infoPanel = FileInfoPanel(parent=self)
         self.hBoxLayout = QHBoxLayout(self.view)
-        self.flowLayout = FlowLayout(self.scrollWidget, isTight=True)
-
-        self.cards = []
-        self.files_data = []
+        # FlowLayout's parent is scrollWidget
+        self.flowLayout = FlowLayout(self.scrollWidget, isTight=True) 
+        self.cards = [] # Store FileIcon instances here
+        self.files_data = [] # Store FileData instances here
         self.currentIndex = -1
 
         self.__initWidget()
@@ -302,16 +302,23 @@ class Explorer(QWidget):
 
     def clear_file_display(self):
         """ Clears the file display area, including cards, data, and info panel """
-        while self.flowLayout.count() > 0:
-            item_to_remove = self.flowLayout.takeAt(0)
-            if item_to_remove is not None: # Ensure the returned item is not None
-                item_to_remove.deleteLater() # Directly delete the QWidget (FileIcon)
-        self.cards.clear()
-        self.files_data.clear()
+        # Deselect any currently selected item and clear info panel
+        if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
+            self.cards[self.currentIndex].setSelected(False)
         self.currentIndex = -1
         self.infoPanel.clearFileInfo()
-        self.trie = Trie()
+        for card in self.cards:
+            card.hide() # Hide it immediately to avoid visual artifacts
+            card.deleteLater() # Schedule the QWidget for deletion
+        self.flowLayout.removeAllWidgets()
+        self.cards.clear()
+        self.files_data.clear()
+        self.trie = Trie() # Reinitialize trie as all file data is gone
         self.pathLabel.setText("Current Path: (Empty)")
+        self.flowLayout.update()
+        self.scrollWidget.update()
+        self.view.update()
+        self.update()
 
     def load_current_terminal_directory(self):
         """此方法现在只负责发起 'ls -a' 命令，不负责改变当前路径。"""
@@ -319,7 +326,7 @@ class Explorer(QWidget):
         if not current_api or current_api.state() != QProcess.Running:
             self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
             self.pathLabel.setText("Error: No active terminal.")
-            self.clear_file_display()
+            self.clear_file_display() # Clear display if no terminal
             return
 
         terminal_obj_name = current_api.terminal_object_name
@@ -327,7 +334,7 @@ class Explorer(QWidget):
         if current_terminal_mode != TerminalInputMode.NORMAL:
             self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
             self.pathLabel.setText("Please login in Terminal Manager first.")
-            self.clear_file_display()
+            self.clear_file_display() # Clear display if not logged in
             return
         # 避免重复发送命令：如果Explorer正忙于处理其他Explorer命令，则等待
         if self.terminal_manager._explorer_current_api_obj_name is not None:
@@ -360,6 +367,7 @@ class Explorer(QWidget):
 
         if command_type.startswith("cd"): # 'cd' 命令成功完成
             self._show_infobar("目录切换成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
+            self.terminal_manager.execute_command_for_explorer("ls -a")
         elif command_type.startswith("ls"): # 'ls' 命令成功完成，现在解析输出并填充 UI
             self._parse_ls_output_and_populate_cards(raw_output)
             self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
@@ -373,14 +381,18 @@ class Explorer(QWidget):
             return current_path
         elif item_name == "..":
             parts = current_path.split('/')
-            if parts and parts[-1] == '':
+            if parts and parts[-1] == '': # Handle trailing slash if present
                 parts = parts[:-1]
-            if not parts or (len(parts) == 1 and (parts[0] == '~' or parts[0] == '/')):
-                return '~' # Already at root, parent is still root (represented by ~)
+            if not parts or (len(parts) == 1 and (parts[0] == '~' or parts[0] == '')):
+                return '~' # Already at root (represented by ~), parent is still root
+            elif current_path == '/': # If current is /, parent is still /
+                return '/'
             else:
                 temp_path = '/'.join(parts[:-1])
-                if temp_path == '':
+                if temp_path == '': # If parts[:-1] results in empty, it means we went from /some_dir to /
                     return '/'
+                elif temp_path == '~': # If we go up from ~/something to ~, keep it as ~
+                    return '~'
                 else:
                     return temp_path
         else:
@@ -389,11 +401,12 @@ class Explorer(QWidget):
             elif current_path == "/":
                 return f"/{item_name}"
             else:
-                return f"{current_path}/{item_name}"
+                # Ensure no double slashes, especially when current_path might end with '/'
+                return f"{current_path.rstrip('/')}/{item_name}"
 
     def _parse_ls_output_and_populate_cards(self, raw_output: str):
         """Parses raw ls -a output, creates FileData objects, and populates the UI."""
-        self.clear_file_display()
+        self.clear_file_display() # Clear existing display before populating new one
         lines = raw_output.strip().split('\n')
         data_lines = []
         is_data_section = False
@@ -437,13 +450,24 @@ class Explorer(QWidget):
 
         for file_data in parsed_data:
             self.addFile(file_data)
+        # After adding all widgets, ensure the layout is properly updated
+        self.flowLayout.update()
+        self.scrollWidget.update()
+        self.view.update()
+        self.update()
         if self.files_data:
-            if len(self.files_data) > 0 and self.files_data[0].name in [".", ".."] and len(self.files_data) > 1:
-                self.setSelectedFile(self.files_data[1])
-            elif len(self.files_data) > 0:
-                self.setSelectedFile(self.files_data[0])
-            else:
-                self.infoPanel.clearFileInfo()
+            initial_selection_index = 0 # Try to select the first non-special file/folder
+            if len(self.files_data) > 2 and self.files_data[0].name == ".." and self.files_data[1].name == ".":
+                 initial_selection_index = 2
+            elif len(self.files_data) > 1 and (self.files_data[0].name == ".." or self.files_data[0].name == "."):
+                 initial_selection_index = 1 # Select the second item if only one special exists
+            if len(self.files_data) > initial_selection_index:
+                self.setSelectedFile(self.files_data[initial_selection_index])
+            else: # Fallback if there are only '.' or '..'
+                 if len(self.files_data) > 0:
+                     self.setSelectedFile(self.files_data[0])
+                 else:
+                    self.infoPanel.clearFileInfo()
         else:
             self.infoPanel.clearFileInfo()
 
@@ -473,13 +497,13 @@ class Explorer(QWidget):
         if normalized_logical_path != self.current_path: # 如果路径不同，则执行 cd 命令
             self.pathLabel.setText(f"Loading: {normalized_logical_path}...")
             self.terminal_manager.execute_command_for_explorer(f"cd {normalized_logical_path}")
-        else: # 如果路径相同，则直接调用 Terminal 的 run 方法来触发刷新
-            self.terminal_manager.run() 
+        else: # 如果路径相同，则直接执行 'ls -a' 命令来刷新
+            self.terminal_manager.execute_command_for_explorer("ls -a")
 
     def addFile(self, file_data: FileData):
         """ Adds a FileData object to the display. """
         try:
-            card = FileIcon(file_data, self)
+            card = FileIcon(file_data, self.scrollWidget) 
             card.clicked.connect(self.setSelectedFile)
             card.doubleClicked.connect(self.handleDoubleClick)
 
@@ -488,6 +512,7 @@ class Explorer(QWidget):
             self.cards.append(card)
             self.files_data.append(file_data) # Store original FileData object
             self.flowLayout.addWidget(card)
+            card.show() # Ensure the newly added card is visible
         except Exception as e:
             print(f"Error adding file card for {file_data.name}: {e}")
 
@@ -525,11 +550,8 @@ class Explorer(QWidget):
 
         if is_directory_for_action:
             self.searchLineEdit.clear()
-            if file_data.name == ".": # 检查是否点击的是 "." 目录，如果是，则只是刷新当前目录
-                self.terminal_manager.run() # <--- 修改：双击 "." 目录时，直接调用 Terminal 的 run 方法刷新
-            else: # 否则，切换到新目录
-                target_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
-                self.load_files(target_path)
+            target_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
+            self.load_files(target_path)
         else:
             self._show_infobar("提示", f"双击文件 '{file_data.name}' 功能暂未实现。", InfoBarPosition.TOP)
 
@@ -549,14 +571,18 @@ class Explorer(QWidget):
             return
 
         items_indices = self.trie.items(keyWord.lower())
-        indexes = {i[1] for i in items_indices}
+        indexes_to_show = {i[1] for i in items_indices}
 
         for i in range(len(self.cards)):
             card = self.cards[i]
-            isVisible = (i in indexes)
+            isVisible = (i in indexes_to_show)
             card.setVisible(isVisible)
             if isVisible:
                 self.flowLayout.addWidget(card)
+        self.flowLayout.update()
+        self.scrollWidget.update()
+        self.view.update()
+        self.update()
 
     def showAllFiles(self):
         if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
@@ -568,6 +594,12 @@ class Explorer(QWidget):
         for card in self.cards:
             card.show()
             self.flowLayout.addWidget(card)
+
+        # After showing all, force layout update
+        self.flowLayout.update()
+        self.scrollWidget.update()
+        self.view.update()
+        self.update()
 
     def go_up_directory(self):
         if self.current_path == "~" or self.current_path == "/":
