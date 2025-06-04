@@ -307,10 +307,10 @@ class Explorer(QWidget):
             self.cards[self.currentIndex].setSelected(False)
         self.currentIndex = -1
         self.infoPanel.clearFileInfo()
+        # 隐藏所有卡片，但并不立即删除它们，以便后续的搜索和显示操作可以重用
         for card in self.cards:
-            card.hide() # Hide it immediately to avoid visual artifacts
-            card.deleteLater() # Schedule the QWidget for deletion
-        self.flowLayout.removeAllWidgets()
+            card.setVisible(False)
+        self.flowLayout.removeAllWidgets() # 从布局中移除所有
         self.cards.clear()
         self.files_data.clear()
         self.trie = Trie() # Reinitialize trie as all file data is gone
@@ -406,7 +406,7 @@ class Explorer(QWidget):
 
     def _parse_ls_output_and_populate_cards(self, raw_output: str):
         """Parses raw ls -a output, creates FileData objects, and populates the UI."""
-        self.clear_file_display() # Clear existing display before populating new one
+        self.clear_file_display() # 确保完全清空现有显示，包括重新初始化 Trie
         lines = raw_output.strip().split('\n')
         data_lines = []
         is_data_section = False
@@ -450,11 +450,7 @@ class Explorer(QWidget):
 
         for file_data in parsed_data:
             self.addFile(file_data)
-        # After adding all widgets, ensure the layout is properly updated
-        self.flowLayout.update()
-        self.scrollWidget.update()
-        self.view.update()
-        self.update()
+        self.showAllFiles() # 初始加载时，只添加所有文件到布局，然后 setSelectedFile 来更新信息面板
         if self.files_data:
             initial_selection_index = 0 # Try to select the first non-special file/folder
             if len(self.files_data) > 2 and self.files_data[0].name == ".." and self.files_data[1].name == ".":
@@ -507,12 +503,11 @@ class Explorer(QWidget):
             card.clicked.connect(self.setSelectedFile)
             card.doubleClicked.connect(self.handleDoubleClick)
 
-            # Insert into Trie for search
-            self.trie.insert(file_data.name.lower(), len(self.cards))
+            self.trie.insert(file_data.name, len(self.cards)) 
             self.cards.append(card)
             self.files_data.append(file_data) # Store original FileData object
-            self.flowLayout.addWidget(card)
-            card.show() # Ensure the newly added card is visible
+            # 初始时不立即添加到布局，由 _parse_ls_output_and_populate_cards 统一调用 showAllFiles 处理
+            # card.show() # Ensure the newly added card is visible
         except Exception as e:
             print(f"Error adding file card for {file_data.name}: {e}")
 
@@ -549,7 +544,7 @@ class Explorer(QWidget):
         _, is_directory_for_action = FileIcon._determine_icon_and_type(file_data.name, file_data.access)
 
         if is_directory_for_action:
-            self.searchLineEdit.clear()
+            self.searchLineEdit.clear() # 清空搜索框
             target_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
             self.load_files(target_path)
         else:
@@ -559,44 +554,44 @@ class Explorer(QWidget):
         pass # To be implemented later
 
     def search(self, keyWord: str):
-        if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
+        if self.currentIndex >= 0 and self.currentIndex < len(self.cards): # 清除当前选中项和信息面板
             self.cards[self.currentIndex].setSelected(False)
             self.currentIndex = -1
             self.infoPanel.clearFileInfo()
-
+        # 清空布局中的所有小部件
         self.flowLayout.removeAllWidgets()
 
-        if not keyWord:
+        if not keyWord: # 如果搜索关键词为空，则显示所有文件
             self.showAllFiles()
             return
-
-        items_indices = self.trie.items(keyWord.lower())
+        # 使用修改后的 Trie 进行搜索，关键词转小写由 Trie 内部处理
+        items_indices = self.trie.items(keyWord)
         indexes_to_show = {i[1] for i in items_indices}
-
-        for i in range(len(self.cards)):
-            card = self.cards[i]
-            isVisible = (i in indexes_to_show)
-            card.setVisible(isVisible)
-            if isVisible:
+        # 遍历所有卡片，只添加匹配的卡片到布局中
+        for i, card in enumerate(self.cards):
+            if i in indexes_to_show:
+                card.setVisible(True)
                 self.flowLayout.addWidget(card)
+            else:
+                card.setVisible(False) # 确保不匹配的卡片被隐藏
+        # 强制更新布局
         self.flowLayout.update()
         self.scrollWidget.update()
         self.view.update()
         self.update()
 
     def showAllFiles(self):
-        if self.currentIndex >= 0 and self.currentIndex < len(self.cards):
+        if self.currentIndex >= 0 and self.currentIndex < len(self.cards): # 清除当前选中项和信息面板
             self.cards[self.currentIndex].setSelected(False)
             self.currentIndex = -1
             self.infoPanel.clearFileInfo()
 
-        self.flowLayout.removeAllWidgets()
-        for card in self.cards:
-            card.show()
+        self.flowLayout.removeAllWidgets() # 清空布局中的所有小部件
+        for card in self.cards: # 重新添加所有卡片到布局中，并确保它们可见
+            card.setVisible(True)
             self.flowLayout.addWidget(card)
 
-        # After showing all, force layout update
-        self.flowLayout.update()
+        self.flowLayout.update() # 强制更新布局
         self.scrollWidget.update()
         self.view.update()
         self.update()

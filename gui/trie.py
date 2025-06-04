@@ -5,43 +5,37 @@ class Trie:
     def __init__(self):
         self.key = ''
         self.value = None
-        self.children = [None] * 26
+        self.children = {} # 将 children 从列表改为字典，以支持任意字符
         self.isEnd = False
 
     def insert(self, key: str, value):
-        key = key.lower()
+        search_key = key.lower() 
 
         node = self
-        for c in key:
-            i = ord(c) - 97
-            if not 0 <= i < 26:
-                return
-
-            if not node.children[i]:
-                node.children[i] = Trie()
-
-            node = node.children[i]
+        for c in search_key: # 不再需要 ord(c) - 97 的逻辑，直接使用字符作为字典键
+            if c not in node.children:
+                node.children[c] = Trie()
+            node = node.children[c]
 
         node.isEnd = True
-        node.key = key
+        node.key = key # 存储原始大小写的 key
         node.value = value
 
     def get(self, key, default=None):
-        node = self.searchPrefix(key)
+        search_key = key.lower()
+        node = self.searchPrefix(search_key)
         if not (node and node.isEnd):
             return default
 
         return node.value
 
     def searchPrefix(self, prefix):
-        prefix = prefix.lower()
+        prefix = prefix.lower() # 搜索前缀也转为小写
         node = self
         for c in prefix:
-            i = ord(c) - 97
-            if not (0 <= i < 26 and node.children[i]):
+            if c not in node.children:
                 return None
-
-            node = node.children[i]
+            node = node.children[c]
 
         return node
 
@@ -57,10 +51,10 @@ class Trie:
         while not q.empty():
             node = q.get()
             if node.isEnd:
-                result.append((node.key, node.value))
+                result.append((node.key, node.value)) # 返回原始大小写的 key
 
-            for c in node.children:
-                if c:
-                    q.put(c)
+            for child_node in node.children.values(): # 遍历字典的 values
+                if child_node: # 确保子节点存在
+                    q.put(child_node)
 
         return result
