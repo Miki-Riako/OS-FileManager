@@ -68,6 +68,8 @@ class FileIcon(QFrame):
         """ Determines the FluentIcon and if it's a directory based on name and access string. """
         if name == "..":
             return FluentIcon.RETURN, True # ".." is always treated as a directory for navigation
+        if name == ".":
+            return FluentIcon.FOLDER, True # . is also a directory for navigation
 
         is_directory = access_string.startswith('d')
         is_file = access_string.startswith('-') or access_string.startswith('f') # 'f' is treated as file for now based on output
@@ -312,7 +314,7 @@ class Explorer(QWidget):
         self.pathLabel.setText("Current Path: (Empty)")
 
     def load_current_terminal_directory(self):
-        """Public slot: Triggered by Terminal's Run button to load the current Terminal directory."""
+        """此方法现在只负责发起 'ls -a' 命令，不负责改变当前路径。"""
         current_api = self.terminal_manager.get_current_api()
         if not current_api or current_api.state() != QProcess.Running:
             self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
@@ -327,14 +329,15 @@ class Explorer(QWidget):
             self.pathLabel.setText("Please login in Terminal Manager first.")
             self.clear_file_display()
             return
-        self.load_files(self.current_path)
-        # if self.terminal_manager._explorer_current_api_obj_name is None:
-        #     self.pathLabel.setText(f"Loading: {self.current_path}...")
-        #     self.terminal_manager.execute_command_for_explorer("ls -a")
-        # else:
-        #     self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
+        # 避免重复发送命令：如果Explorer正忙于处理其他Explorer命令，则等待
+        if self.terminal_manager._explorer_current_api_obj_name is not None:
+             self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
+             return
+        self.pathLabel.setText(f"Loading: {self.current_path}...")
+        self.terminal_manager.execute_command_for_explorer("ls -a")
 
     def _handle_explorer_command_response(self, terminal_obj_name: str, raw_output: str, success: bool, error_msg: str, command_type: str):
+        """处理来自 Terminal 的命令执行结果。"""
         if not success:
             self._show_infobar("命令失败", f"执行命令失败：{error_msg}", InfoBarPosition.TOP)
             self.pathLabel.setText(f"Error: {error_msg}")
@@ -355,12 +358,8 @@ class Explorer(QWidget):
                     extracted_path = extracted_path.replace('//', '/')
         self.current_path = extracted_path # 始终更新当前路径，使其与终端同步
 
-        if command_type.startswith("cd"): # 根据完成的命令类型进行处理
-            # 'cd' 命令成功完成，现在需要触发 'ls -a'
+        if command_type.startswith("cd"): # 'cd' 命令成功完成
             self._show_infobar("目录切换成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
-            # 使用 QTimer.singleShot(0, ...) 延迟 'ls -a' 命令的发送
-            # 确保 Terminal 内部的 _explorer_current_api_obj_name 已经被重置为 None
-            QTimer.singleShot(0, lambda: self.terminal_manager.execute_command_for_explorer("ls -a"))
         elif command_type.startswith("ls"): # 'ls' 命令成功完成，现在解析输出并填充 UI
             self._parse_ls_output_and_populate_cards(raw_output)
             self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
@@ -414,7 +413,6 @@ class Explorer(QWidget):
             match = self._ls_output_regex.match(line)
             if match:
                 data = match.groupdict()
-                # Create FileData object directly from parsed strings
                 file_data = FileData(
                     name=data['fileName'].strip(),
                     uid=data['uid'].strip(),
@@ -423,43 +421,60 @@ class Explorer(QWidget):
                     creation_time=data['creation_time'].strip(),
                     modified_time=data['modified_time'].strip()
                 )
-                if file_data.name == ".": # Exclude the current directory entry from display, it's redundant
-                    continue 
-
                 parsed_data.append(file_data)
 
         # Sort directories before files, then alphabetically
         def sort_key(file_data: FileData):
-            # Check if it's a directory using FileIcon's logic for consistency
             _, is_dir = FileIcon._determine_icon_and_type(file_data.name, file_data.access)
-            return (not is_dir, file_data.name.lower()) # Directories first, then alphabetical
+            if file_data.name == "..":
+                return (0, file_data.name.lower())
+            elif file_data.name == ".":
+                return (1, file_data.name.lower())
+            else:
+                return (2 if is_dir else 3, file_data.name.lower()) # Directories first, then alphabetical
 
         parsed_data.sort(key=sort_key)
 
         for file_data in parsed_data:
             self.addFile(file_data)
-        
         if self.files_data:
-            self.setSelectedFile(self.files_data[0])
+            if len(self.files_data) > 0 and self.files_data[0].name in [".", ".."] and len(self.files_data) > 1:
+                self.setSelectedFile(self.files_data[1])
+            elif len(self.files_data) > 0:
+                self.setSelectedFile(self.files_data[0])
+            else:
+                self.infoPanel.clearFileInfo()
         else:
             self.infoPanel.clearFileInfo()
 
         self.pathLabel.setText(f"Current Path: {self.current_path}")
 
     def load_files(self, logical_path: str):
-        if self.terminal_manager._explorer_current_api_obj_name is not None:
+        """发起文件加载（可能包括目录切换）。"""
+        if self.terminal_manager._explorer_current_api_obj_name is not None: # 检查 Explorer 是否正在执行另一个命令
              self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
              return
-        self.pathLabel.setText(f"Loading: {logical_path}...")
+
+        current_api = self.terminal_manager.get_current_api() # 检查终端状态
+        if not current_api or current_api.state() != QProcess.Running:
+            self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
+            return
+
+        terminal_obj_name = current_api.terminal_object_name
+        current_terminal_mode = self.terminal_manager.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
+            return
 
         normalized_logical_path = logical_path.replace('//', '/')
         if normalized_logical_path == "":
             normalized_logical_path = "~"
-        if normalized_logical_path != self.current_path:
-            cd_command = f"cd {normalized_logical_path}"
-            self.terminal_manager.execute_command_for_explorer(cd_command)
-        else:
-            self.terminal_manager.execute_command_for_explorer("ls -a")
+
+        if normalized_logical_path != self.current_path: # 如果路径不同，则执行 cd 命令
+            self.pathLabel.setText(f"Loading: {normalized_logical_path}...")
+            self.terminal_manager.execute_command_for_explorer(f"cd {normalized_logical_path}")
+        else: # 如果路径相同，则直接调用 Terminal 的 run 方法来触发刷新
+            self.terminal_manager.run() 
 
     def addFile(self, file_data: FileData):
         """ Adds a FileData object to the display. """
@@ -506,25 +521,15 @@ class Explorer(QWidget):
 
     def handleDoubleClick(self, file_data: FileData):
         """ Handles double-click event on a file/directory icon. """
-        current_api = self.terminal_manager.get_current_api()
-        if not current_api or current_api.state() != QProcess.Running:
-            self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
-            return
-
-        terminal_obj_name = current_api.terminal_object_name
-        current_terminal_mode = self.terminal_manager.get_terminal_mode(terminal_obj_name)
-        if current_terminal_mode != TerminalInputMode.NORMAL:
-            self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
-            return
-
-        # Determine if it's a directory for double-click action using FileIcon's logic
         _, is_directory_for_action = FileIcon._determine_icon_and_type(file_data.name, file_data.access)
 
         if is_directory_for_action:
             self.searchLineEdit.clear()
-            # Construct the target path using the new helper
-            target_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
-            self.load_files(target_path)
+            if file_data.name == ".": # 检查是否点击的是 "." 目录，如果是，则只是刷新当前目录
+                self.terminal_manager.run() # <--- 修改：双击 "." 目录时，直接调用 Terminal 的 run 方法刷新
+            else: # 否则，切换到新目录
+                target_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
+                self.load_files(target_path)
         else:
             self._show_infobar("提示", f"双击文件 '{file_data.name}' 功能暂未实现。", InfoBarPosition.TOP)
 
@@ -565,22 +570,9 @@ class Explorer(QWidget):
             self.flowLayout.addWidget(card)
 
     def go_up_directory(self):
-        current_api = self.terminal_manager.get_current_api()
-        if not current_api or current_api.state() != QProcess.Running:
-            self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
-            return
-
-        terminal_obj_name = current_api.terminal_object_name
-        current_terminal_mode = self.terminal_manager.get_terminal_mode(terminal_obj_name)
-        if current_terminal_mode != TerminalInputMode.NORMAL:
-            self._show_infobar("请先登录", "请先在 '终端管理器' 标签页登录系统。", InfoBarPosition.TOP)
-            return
-
         if self.current_path == "~" or self.current_path == "/":
             self._show_infobar("提示", "已在根目录。", InfoBarPosition.TOP)
             return
 
-        # Use the helper to determine the parent path
         new_path = Explorer._get_item_logical_path(self.current_path, "..")
         self.load_files(new_path)
-

@@ -179,9 +179,10 @@ class Terminal(QWidget):
                 "", # 无特定错误信息
                 issued_command_type # 传递刚刚完成的命令类型
             )
-            # self._explorer_command_sent_at_index = -1
-            # self._explorer_current_api_obj_name = None
-            # request_info["output_buffer"].clear()
+            if issued_command_type == "cd" and not is_error:
+                self.requestExplorerRefresh.emit()
+            elif issued_command_type == "cd" and is_error:
+                self.warning("目录切换失败", f"无法切换到目标目录，请检查路径。")
 
     def _send_explorer_error(self, terminal_object_name, error_message, original_command: str = ""):
         command_lower = original_command.lower().strip() # 根据原始命令判断类型
