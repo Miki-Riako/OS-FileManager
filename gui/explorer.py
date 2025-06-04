@@ -2,7 +2,7 @@ from typing import List
 import re
 import os
 
-from PySide6.QtCore import Qt, Signal, QUrl, QEvent, QProcess
+from PySide6.QtCore import Qt, Signal, QUrl, QEvent, QProcess, QTimer
 from PySide6.QtGui import QDesktopServices, QPainter, QPen, QColor
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame
 
@@ -271,7 +271,7 @@ class Explorer(QWidget):
         self.navLayout.addStretch(1)
 
         self.searchLineEdit.setPlaceholderText('Search files')
-        self.searchLineEdit.setFixedWidth(1096) # Adjust width as needed for your layout
+        self.searchLineEdit.setFixedWidth(1096)
 
     def __initLayout(self):
         self.layout.addLayout(self.navLayout)
@@ -327,24 +327,21 @@ class Explorer(QWidget):
             self.pathLabel.setText("Please login in Terminal Manager first.")
             self.clear_file_display()
             return
-        
-        if self.terminal_manager._explorer_current_api_obj_name is None:
-            self.pathLabel.setText(f"Loading: {self.current_path}...")
-            self.terminal_manager.execute_command_for_explorer("ls -a")
-        else:
-            self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
+        self.load_files(self.current_path)
+        # if self.terminal_manager._explorer_current_api_obj_name is None:
+        #     self.pathLabel.setText(f"Loading: {self.current_path}...")
+        #     self.terminal_manager.execute_command_for_explorer("ls -a")
+        # else:
+        #     self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
 
-    def _handle_explorer_command_response(self, terminal_obj_name: str, raw_output: str, success: bool, error_msg: str):
-        if self.terminal_manager._explorer_current_api_obj_name != terminal_obj_name:
-            print(f"[Explorer] Ignoring output from {terminal_obj_name} as it's not the active Explorer API.")
-            return
-
+    def _handle_explorer_command_response(self, terminal_obj_name: str, raw_output: str, success: bool, error_msg: str, command_type: str):
         if not success:
             self._show_infobar("命令失败", f"执行命令失败：{error_msg}", InfoBarPosition.TOP)
             self.pathLabel.setText(f"Error: {error_msg}")
             self.clear_file_display()
             return
 
+        extracted_path = "~" # 默认值
         match = self._prompt_regex.search(raw_output)
         if match:
             prompt_full = match.group(0).strip()
@@ -353,14 +350,22 @@ class Explorer(QWidget):
             if path_start_index != -1 and path_end_index != -1 and path_start_index < path_end_index:
                 extracted_path = prompt_full[path_start_index:path_end_index].strip()
                 if extracted_path == "":
-                    self.current_path = "~"
+                    extracted_path = "~"
                 else:
-                    self.current_path = extracted_path.replace('//', '/')
-        else:
-            print(f"[Explorer] Warning: Could not find prompt in command response. Raw output: {raw_output[:200]}...")
-            
-        self._parse_ls_output_and_populate_cards(raw_output)
-        self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
+                    extracted_path = extracted_path.replace('//', '/')
+        self.current_path = extracted_path # 始终更新当前路径，使其与终端同步
+
+        if command_type.startswith("cd"): # 根据完成的命令类型进行处理
+            # 'cd' 命令成功完成，现在需要触发 'ls -a'
+            self._show_infobar("目录切换成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
+            # 使用 QTimer.singleShot(0, ...) 延迟 'ls -a' 命令的发送
+            # 确保 Terminal 内部的 _explorer_current_api_obj_name 已经被重置为 None
+            QTimer.singleShot(0, lambda: self.terminal_manager.execute_command_for_explorer("ls -a"))
+        elif command_type.startswith("ls"): # 'ls' 命令成功完成，现在解析输出并填充 UI
+            self._parse_ls_output_and_populate_cards(raw_output)
+            self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
+        else: # 处理其他命令的完成，如果需要的话
+            pass # 对于 "other" 类型命令，我们目前不进行特殊处理
 
     @staticmethod
     def _get_item_logical_path(current_path: str, item_name: str) -> str:

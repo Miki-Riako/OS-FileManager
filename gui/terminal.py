@@ -30,7 +30,7 @@ class TerminalInputMode:
     INITIALIZING = "INITIALIZING" # 表示 Shell 刚刚启动，等待登录
 
 class Terminal(QWidget):
-    explorerCommandOutputReady = Signal(str, str, bool, str) # 用于 Explorer
+    explorerCommandOutputReady = Signal(str, str, bool, str, str) # 用于 Explorer
     requestExplorerRefresh = Signal()
 
     def __init__(self, text: str, parent=None):
@@ -155,7 +155,6 @@ class Terminal(QWidget):
     def _handle_api_for_explorer(self, terminal_object_name: str, output: str, is_error, full_text: str):
         """处理来自 API 的标准输出信号，专门用于 Explorer。"""
         if terminal_object_name not in self._explorer_pending_requests:
-            print(f"[Explorer] Warning: _explorer_pending_requests not initialized for {terminal_object_name}. Ignoring output.")
             return
         request_info = self._explorer_pending_requests[terminal_object_name]
         request_info["output_buffer"].append(output) # 累积所有输出
@@ -166,25 +165,34 @@ class Terminal(QWidget):
             prompt_matches = list(self.main_shell_prompt_regex.finditer(full_buffered_output))
             if prompt_matches:
                 last_prompt_match = prompt_matches[-1]
-                if full_buffered_output[last_prompt_match.start():].strip() == last_prompt_match.group(0).strip():
+                if full_buffered_output.strip().endswith(last_prompt_match.group(0).strip()):
                     command_is_complete = True
         if command_is_complete:
+            self._explorer_command_sent_at_index = -1
+            self._explorer_current_api_obj_name = None
+            issued_command_type = request_info.get("command_type", "unknown") # 获取存储的命令类型
+            request_info["output_buffer"].clear() # 清空缓冲
             self.explorerCommandOutputReady.emit(
                 terminal_object_name,
                 full_buffered_output, # 发送所有收集到的输出
                 not is_error, # 假设成功，如果不是来自错误流
-                "" # 无特定错误信息
+                "", # 无特定错误信息
+                issued_command_type # 传递刚刚完成的命令类型
             )
-            self._explorer_command_sent_at_index = -1
-            self._explorer_current_api_obj_name = None
-            request_info["output_buffer"].clear()
+            # self._explorer_command_sent_at_index = -1
+            # self._explorer_current_api_obj_name = None
+            # request_info["output_buffer"].clear()
 
-    def _send_explorer_error(self, terminal_object_name, error_message):
+    def _send_explorer_error(self, terminal_object_name, error_message, original_command: str = ""):
+        command_lower = original_command.lower().strip() # 根据原始命令判断类型
+        cmd_type = "cd" if command_lower.startswith("cd") else "ls" if command_lower.startswith("ls") else "unknown"
+
         self.explorerCommandOutputReady.emit(
             terminal_object_name,
             "", # 无输出
             False, # 失败
-            error_message
+            error_message,
+            cmd_type # 传递判断后的命令类型
         )
         self._explorer_command_sent_at_index = -1
         self._explorer_current_api_obj_name = None
@@ -283,25 +291,32 @@ class Terminal(QWidget):
         api = self.get_current_api()
         if not api:
             self.warning("警告", "没有激活的终端API实例可供Explorer使用。")
-            self.explorerCommandOutputReady.emit("", "", False, "No active terminal API for Explorer.")
+            self.explorerCommandOutputReady.emit("", "", False, "No active terminal API for Explorer.", "")
             return False
         terminal_obj_name = api.terminal_object_name
         text_edit = self._get_terminal_widget_by_object_name(terminal_obj_name)
         if not text_edit:
             self.warning("警告", f"未找到终端UI组件 '{terminal_obj_name}'。")
-            self.explorerCommandOutputReady.emit(terminal_obj_name, "", False, f"No UI widget for '{terminal_obj_name}'.")
+            self.explorerCommandOutputReady.emit(terminal_obj_name, "", False, f"No UI widget for '{terminal_obj_name}'.", "")
             return False
         if self._explorer_current_api_obj_name is not None:
             self.warning("警告", "Explorer命令正在进行中，请稍后。")
-            self.explorerCommandOutputReady.emit(terminal_obj_name, "", False, "Another Explorer command is already in progress.")
+            self.explorerCommandOutputReady.emit(terminal_obj_name, "", False, "Another Explorer command is already in progress.", "")
             return False
         current_terminal_mode = self.get_terminal_mode(terminal_obj_name)
         if current_terminal_mode != TerminalInputMode.NORMAL:
-            self._send_explorer_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。")
+            self._send_explorer_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。", command)
             return False
         self._explorer_current_api_obj_name = terminal_obj_name
         self._explorer_command_sent_at_index = len(text_edit.document().toPlainText()) # 记录当前文本长度。
-        self._explorer_pending_requests[terminal_obj_name] = {"output_buffer": []} # 初始化或清空缓冲
+
+        command_lower = command.lower().strip()
+        cmd_type = "cd" if command_lower.startswith("cd") else "ls" if command_lower.startswith("ls") else "other"
+        self._explorer_pending_requests[terminal_obj_name] = {
+            "output_buffer": [],
+            "command_type": cmd_type
+        }
+
         self._append_to_terminal(text_edit, command + '\n') # 注意：这行内容是 GUI 自己的显示，不是来自 Shell 的回显
         api.send_input_to_app(command)
         return True
