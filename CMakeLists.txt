@@ -7,7 +7,7 @@ add_executable(app
         src/main.cpp
 
         src/DiskDriver.cpp src/DiskDriver.h
-        src/FileSystem.cpp src/FileSystem.h
+        src/FileManagerSystem.cpp src/FileManagerSystem.h
         src/UserInterface.cpp src/UserInterface.h
         src/Shell.cpp src/Shell.h
 
@@ -18,7 +18,7 @@ add_executable(app
         src/entity/Vim.h src/entity/Vim.cpp
 
         src/entity/Directory.h
-        src/entity/FileSystemInfo.h
+        src/entity/FileManagerSystemInfo.h
         src/entity/FileIndex.h
         src/entity/INode.h
         src/entity/User.h)

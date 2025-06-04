@@ -220,7 +220,7 @@ class Explorer(QWidget):
         self._ls_output_regex = re.compile(
             r"^\s*(?P<fileName>.*?)\s*\|\s*(?P<uid>\d+)\s*\|\s*(?P<owner>.*?)\s*\|\s*(?P<access>[fdrwx\-]+)\s*\|\s*(?P<creation_time>[\d\-\s:]+)\s*\|\s*(?P<modified_time>[\d\-\s:]+)$"
         )
-        self._prompt_regex = re.compile(r"FileSystem@[\w\.-]+:.*?\$\s")
+        self._prompt_regex = re.compile(r"OSFileManagerSystem@[\w\.-]+:.*?\$\s")
 
         self.backButton = ToolButton(FluentIcon.RETURN, self)
         self.pathLabel = StrongBodyLabel(f"Current Path: {self.current_path}", self)
@@ -321,7 +321,7 @@ class Explorer(QWidget):
         self.update()
 
     def load_current_terminal_directory(self):
-        """此方法现在只负责发起 'ls -a' 命令，不负责改变当前路径。"""
+        """此方法现在只负责发起 'ls -l' 命令，不负责改变当前路径。"""
         current_api = self.terminal_manager.get_current_api()
         if not current_api or current_api.state() != QProcess.Running:
             self._show_infobar("错误", "当前没有激活或运行中的终端实例。", InfoBarPosition.TOP)
@@ -338,10 +338,10 @@ class Explorer(QWidget):
             return
         # 避免重复发送命令：如果Explorer正忙于处理其他Explorer命令，则等待
         if self.terminal_manager._explorer_current_api_obj_name is not None:
-             self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
+            #  self._show_infobar("请稍候", "正在加载目录，请等待当前操作完成。", InfoBarPosition.TOP)
              return
         self.pathLabel.setText(f"Loading: {self.current_path}...")
-        self.terminal_manager.execute_command_for_explorer("ls -a")
+        self.terminal_manager.execute_command_for_explorer("ls -l")
 
     def _handle_explorer_command_response(self, terminal_obj_name: str, raw_output: str, success: bool, error_msg: str, command_type: str):
         """处理来自 Terminal 的命令执行结果。"""
@@ -367,10 +367,10 @@ class Explorer(QWidget):
 
         if command_type.startswith("cd"): # 'cd' 命令成功完成
             self._show_infobar("目录切换成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
-            self.terminal_manager.execute_command_for_explorer("ls -a")
+            self.terminal_manager.execute_command_for_explorer("ls -l")
         elif command_type.startswith("ls"): # 'ls' 命令成功完成，现在解析输出并填充 UI
             self._parse_ls_output_and_populate_cards(raw_output)
-            self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
+            # self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
         else: # 处理其他命令的完成，如果需要的话
             pass # 对于 "other" 类型命令，我们目前不进行特殊处理
 
@@ -405,7 +405,7 @@ class Explorer(QWidget):
                 return f"{current_path.rstrip('/')}/{item_name}"
 
     def _parse_ls_output_and_populate_cards(self, raw_output: str):
-        """Parses raw ls -a output, creates FileData objects, and populates the UI."""
+        """Parses raw ls -l output, creates FileData objects, and populates the UI."""
         self.clear_file_display() # 确保完全清空现有显示，包括重新初始化 Trie
         lines = raw_output.strip().split('\n')
         data_lines = []
@@ -493,8 +493,8 @@ class Explorer(QWidget):
         if normalized_logical_path != self.current_path: # 如果路径不同，则执行 cd 命令
             self.pathLabel.setText(f"Loading: {normalized_logical_path}...")
             self.terminal_manager.execute_command_for_explorer(f"cd {normalized_logical_path}")
-        else: # 如果路径相同，则直接执行 'ls -a' 命令来刷新
-            self.terminal_manager.execute_command_for_explorer("ls -a")
+        else: # 如果路径相同，则直接执行 'ls -l' 命令来刷新
+            self.terminal_manager.execute_command_for_explorer("ls -l")
 
     def addFile(self, file_data: FileData):
         """ Adds a FileData object to the display. """

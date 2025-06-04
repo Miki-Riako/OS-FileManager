@@ -57,7 +57,7 @@ class Terminal(QWidget):
         self.login_username_prompt_regex = re.compile(r"host@login:Username\$ ")
         self.login_password_prompt_regex = re.compile(r"host@login:Password\$ ")
         self.sudo_password_prompt_regex = re.compile(r"\[sudo\] password for .*?:\s")
-        self.main_shell_prompt_regex = re.compile(r"FileSystem@[\w\.-]+:.*?\$\s")
+        self.main_shell_prompt_regex = re.compile(r"OSFileManagerSystem@[\w\.-]+:.*?\$\s")
 
         self.__initWidget()
         self.setObjectName(text.replace(' ', '-'))
