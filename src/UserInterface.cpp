@@ -930,7 +930,7 @@ bool UserInterface::chmod(uint8_t uid, std::vector<std::string> src, std::string
     return true;
 }
 
-bool UserInterface::useradd(uint8_t uid, std::string name) {
+bool UserInterface::mkuser(uint8_t uid, std::string name) {
     if (!sudoMode || uid != 1) {
         std::cout << currentCmd << ": Permission denied" << std::endl;
         return false;
@@ -961,12 +961,12 @@ bool UserInterface::useradd(uint8_t uid, std::string name) {
         return false;
     }
 
-    fileSystem.useradd(newUid, name, passwd);
+    fileSystem.mkuser(newUid, name, passwd);
     fileSystem.update();
     return true;
 }
 
-bool UserInterface::userdel(uint8_t uid, std::string name) {
+bool UserInterface::rmuser(uint8_t uid, std::string name) {
     if (!sudoMode || uid != 1) {
         std::cout << currentCmd << ": Permission denied" << std::endl;
         return false;
@@ -981,12 +981,12 @@ bool UserInterface::userdel(uint8_t uid, std::string name) {
         return false;
     }
 
-    fileSystem.userdel(delUid);
+    fileSystem.rmuser(delUid);
     fileSystem.update();
     return true;
 }
 
-bool UserInterface::userlist() {
+bool UserInterface::lsuser() {
     User user[MAX_USER_NUMS];
     for (int i = 0; i < MAX_USER_NUMS; i++) {
         fileSystem.getUser(i + 1, user + i);

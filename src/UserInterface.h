@@ -44,9 +44,9 @@ public:
     bool chmod(uint8_t uid, std::string name, std::string who, std::string access, const std::string& initCmd); //chmod命令接口,修改文件或目录权限
     bool chmod(uint8_t uid, std::vector<std::string> src, std::string name, std::string who, std::string access, const std::string& initCmd); //chmod命令接口,根据src路径修改文件或目录权限
 
-    bool useradd(uint8_t uid, std::string name); //useradd命令接口，添加用户
-    bool userdel(uint8_t uid, std::string name); //userdel命令接口，删除用户
-    bool userlist(); //userlist命令接口，显示用户列表
+    bool mkuser(uint8_t uid, std::string name); //mkuser命令接口，添加用户
+    bool rmuser(uint8_t uid, std::string name); //rmuser命令接口，删除用户
+    bool lsuser(); //lsuser命令接口，显示用户列表
     bool passwd(uint8_t uid, std::string name); //passwd命令接口，修改当前用户密码
     bool trust(uint8_t uid, std::string currentUser, std::string targetUser); //trust命令接口，添加当前用户的信任用户
     bool distrust(uint8_t uid, std::string currentUser, std::string targetUser); //distrust命令接口，删除当前用户的信任用户

@@ -45,18 +45,15 @@ public:
     void cmd_format(); //format命令处理程序
     void cmd_chmod(); //chmod命令处理程序
 
-    void cmd_useradd(); //useradd命令处理程序
-    void cmd_userdel(); //userdel命令处理程序
-    void cmd_userlist(); //userlist命令处理程序
+    void cmd_mkuser(); //mkuser命令处理程序
+    void cmd_rmuser(); //rmuser命令处理程序
+    void cmd_lsuser(); //lsuser命令处理程序
     void cmd_passwd(); //passwd命令处理程序
     void cmd_trust(); //trust命令处理程序
     void cmd_distrust(); //distrust命令处理程序
 
     void cmd_help(); //help命令处理程序
     void cmd_clear(); //clear命令处理程序
-
-    const std::vector<std::string>& getCmd() const;
-    void setCmd(const std::vector<std::string>& cmd);
 
     void outputPrefix(); //输出当前文件系统的命令提示符
 

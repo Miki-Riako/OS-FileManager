@@ -32,8 +32,8 @@ public:
     uint8_t userVerify(std::string userName, std::string password); //用户身份认证,若认证成功返回非0的uid，否则返回0
     uint8_t duplicateDetection(std::string userName); //用户身份认证,若认证成功返回非0的uid，否则返回0
     int8_t emptyDetection(); //查找用户列表0-7中的第一个空位置，没空位置则返回最大用户数，表示用户列表已满
-    void useradd(int8_t idx, std::string name, std::string password); //添加用户
-    void userdel(uint8_t uid); //删除用户
+    void mkuser(int8_t idx, std::string name, std::string password); //添加用户
+    void rmuser(uint8_t uid); //删除用户
     void passwd(uint8_t uid, std::string password); //修改某个用户的密码
 
     bool grantTrustUser(std::string currentUser, std::string targetUser); //添加信任用户组

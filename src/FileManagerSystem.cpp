@@ -244,7 +244,7 @@ int8_t FileManagerSystem::emptyDetection() {
     return MAX_USER_NUMS; //如果没有空闲条目，返回最大用户数量
 }
 
-void FileManagerSystem::useradd(int8_t idx, std::string name, std::string password) {
+void FileManagerSystem::mkuser(int8_t idx, std::string name, std::string password) {
     systemInfo.users[idx].uid = idx + 1; //设置用户ID
     strcpy(systemInfo.users[idx].name, name.c_str()); //复制用户名
     strcpy(systemInfo.users[idx].password, password.c_str()); //复制密码
@@ -256,7 +256,7 @@ void FileManagerSystem::useradd(int8_t idx, std::string name, std::string passwo
     systemInfo.flag = 1; //标记系统信息已修改
 }
 
-void FileManagerSystem::userdel(uint8_t uid) {
+void FileManagerSystem::rmuser(uint8_t uid) {
     uint8_t idx = uid - 1; //根据用户ID计算索引
     systemInfo.users[idx].uid = 0; //清除用户ID
     for (int8_t i = 0; i < MAX_USER_NUMS; i++) {

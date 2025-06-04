@@ -9,7 +9,7 @@ SHELL_COMMANDS = [
     'clear', 'history', 'export', 'unset', 'alias', 'unalias', 'source',
     'chmod', 'chown', 'tar', 'zip', 'unzip', 'wget', 'curl', 'htop', 'top',
 
-    'logout', 'format', 'useradd', 'userdel', 'userlist', 'passwd', 'trust', 'distrust', 'vim',
+    'logout', 'format', 'mkuser', 'rmuser', 'lsuser', 'passwd', 'trust', 'distrust', 'vim',
     'help', 'rmdir', 'touch'
 ]
 

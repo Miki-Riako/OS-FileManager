@@ -5,29 +5,30 @@ Shell::Shell() {
     isExit = false;
 
     //help["Command"] = "Usage               Interpret";
+    help["touch"]    = "touch <FILE>                     touch file timestamps";
     help["cat"]      = "cat <FILE>                       concatenate and display files";
-    help["cd"]       = "cd <DIR>                         change the shell working directory";
-    help["chmod"]    = "chmod <FILE> -a|t|o [r][w][x]    change file modes or Access Control Lists";
-    help["clear"]    = "clear                            clear the terminal screen";
-    help["cp"]       = "cp <SOURCE> <DEST>               copy files and directories";
-    help["exit"]     = "exit                             exit the shell";
-    help["format"]   = "format                           format disks or tapes";
-    help["help"]     = "help                             display information about builtin commands";
-    help["logout"]   = "logout                           exit a login shell";
-    help["ls"]       = "ls [-l] [<DIR>]                  list directory contents";
+    help["rm"]       = "rm <FILE>                        remove files";
+    help["rmdir"]    = "rmdir <DIR>                      remove directories";
     help["mkdir"]    = "mkdir <DIR>                      make directories";
+    help["cd"]       = "cd <DIR>                         change the working directory";
+    help["ls"]       = "ls [-l] [<DIR>]                  list directory contents";
+    help["logout"]   = "logout                           exit a login shell";
+    help["format"]   = "format                           format disks or tapes";
+
+    help["help"]     = "help                             display information about builtin commands";
+    help["clear"]    = "clear                            clear the terminal screen";
+    help["exit"]     = "exit                             exit the shell";
+    help["chmod"]    = "chmod <FILE> -a|t|o [r][w][x]    change file modes or Access Control Lists";
+    help["cp"]       = "cp <SOURCE> <DEST>               copy files and directories";
     help["mv"]       = "mv <SOURCE> <DEST>               move (rename) files";
     help["passwd"]   = "passwd                           update user's authentication tokens";
-    help["rm"]       = "rm <FILE>                        remove files or directories";
-    help["rmdir"]    = "rmdir <DIR>                      remove empty directories";
     help["sudo"]     = "sudo <COMMAND>                   execute a command as another user";
-    help["touch"]    = "touch <FILE>                     change file timestamps";
-    help["useradd"]  = "useradd <USERNAME>               create a new user or update default new user information";
-    help["userdel"]  = "userdel <USERNAME>               delete a user account and related files";
-    help["vim"]      = "vim <FILE>                       a programmer's file editor";
-    help["userlist"] = "userlist                         display a list of system users";
+    help["mkuser"]   = "mkuser <USERNAME>                create a new user or update default new user information";
+    help["rmuser"]   = "rmuser <USERNAME>                delete a user account and related files";
+    help["lsuser"]   = "lsuser                           display a list of system users";
     help["trust"]    = "trust <USERNAME>                 add a user to the trusted list";
     help["distrust"] = "distrust <USERNAME>              remove a user from the trusted list";
+    help["vim"]      = "vim <FILE>                       a programmer's file editor";
 
     userInterface.initialize();
 }
@@ -47,12 +48,10 @@ std::vector<std::string> Shell::split_path(std::string path) {
                 paths.push_back(item);
                 item = "";
                 occur = true;
-            }
-            else {
+            } else {
                 continue;
             }
-        }
-        else {
+        } else {
             occur = false;
             item += ch;
         }
@@ -70,23 +69,19 @@ std::pair<bool, std::vector<std::string>> Shell::split_cmd(std::string& cmd) {
                 cmds.emplace_back(item);
                 isQuote = false;
                 item = "";
-            }
-            else {
+            } else {
                 item += ch;
             }
-        }
-        else {
+        } else {
             if (ch == '\"') {
                 if (!item.empty()) {
                     cmds.emplace_back(item);
                 }
                 isQuote = true;
                 item = "";
-            }
-            else if (ch != ' ' && ch != '\t') {
+            } else if (ch != ' ' && ch != '\t') {
                 item += ch;
-            }
-            else if (!item.empty()) {
+            } else if (!item.empty()) {
                 cmds.emplace_back(item);
                 item = "";
             }
@@ -112,12 +107,7 @@ void Shell::exec() {
     std::tie(valid, cmd) = split_cmd(input);
 
     if (!valid) {
-        std::cout <<
-            // RED <<
-            "syntax error:" <<
-            // RESET <<
-            " missing terminating \" character" <<
-            std::endl;
+        std::cout << "syntax error:" << " missing terminating \" character" << std::endl;
         return;
     }
     if (cmd.empty()) {
@@ -145,50 +135,50 @@ void Shell::exec() {
     userInterface.setSudoMode(isSudo);
     userInterface.setCurrentCmd(cmdType);
 
-    if (cmdType == "logout") {
-        cmd_logout();
-    } else if (cmdType == "exit") {
-        cmd_exit();
+    if (cmdType == "cat") {
+        cmd_cat();
     } else if (cmdType == "cd") {
         cmd_cd();
-    } else if (cmdType == "ls") {
-        cmd_ls();
-    } else if (cmdType == "touch") {
-        cmd_touch();
-    } else if (cmdType == "cat") {
-        cmd_cat();
-    } else if (cmdType == "vim") {
-        cmd_vim();
-    } else if (cmdType == "mv") {
-        cmd_mv();
-    } else if (cmdType == "cp") {
-        cmd_cp();
-    } else if (cmdType == "rm") {
-        cmd_rm();
-    } else if (cmdType == "mkdir") {
-        cmd_mkdir();
-    } else if (cmdType == "rmdir") {
-        cmd_rmdir();
-    } else if (cmdType == "format") {
-        cmd_format();
     } else if (cmdType == "chmod") {
         cmd_chmod();
-    } else if (cmdType == "useradd") {
-        cmd_useradd();
-    } else if (cmdType == "userdel") {
-        cmd_userdel();
-    } else if (cmdType == "userlist") {
-        cmd_userlist();
-    } else if (cmdType == "passwd") {
-        cmd_passwd();
-    } else if (cmdType == "trust") {
-        cmd_trust();
-    } else if (cmdType == "distrust") {
-        cmd_distrust();
-    } else if (cmdType == "help") {
-        cmd_help();
     } else if (cmdType == "clear") {
         cmd_clear();
+    } else if (cmdType == "cp") {
+        cmd_cp();
+    } else if (cmdType == "distrust") {
+        cmd_distrust();
+    } else if (cmdType == "exit") {
+        cmd_exit();
+    } else if (cmdType == "format") {
+        cmd_format();
+    } else if (cmdType == "help") {
+        cmd_help();
+    } else if (cmdType == "ls") {
+        cmd_ls();
+    } else if (cmdType == "lsuser") {
+        cmd_lsuser();
+    } else if (cmdType == "logout") {
+        cmd_logout();
+    } else if (cmdType == "mkdir") {
+        cmd_mkdir();
+    } else if (cmdType == "mkuser") {
+        cmd_mkuser();
+    } else if (cmdType == "mv") {
+        cmd_mv();
+    } else if (cmdType == "passwd") {
+        cmd_passwd();
+    } else if (cmdType == "rm") {
+        cmd_rm();
+    } else if (cmdType == "rmdir") {
+        cmd_rmdir();
+    } else if (cmdType == "rmuser") {
+        cmd_rmuser();
+    } else if (cmdType == "touch") {
+        cmd_touch();
+    } else if (cmdType == "trust") {
+        cmd_trust();
+    } else if (cmdType == "vim") {
+        cmd_vim();
     } else {
         std::cout << cmdType << ": command not found" << std::endl;
     }
@@ -215,7 +205,7 @@ void Shell::cmd_login() {
         uint8_t uid = userInterface.userVerify(userName, password);
         if (uid == 0) {
             cmd_clear();
-            std::cout << RED << "Access denied. " << RESET << "Please check username or password." << std::endl;
+            std::cout << "Access denied. " << "Please check username or password." << std::endl;
         }
         else {
             userInterface.getUser(uid, &user);
@@ -372,31 +362,6 @@ void Shell::cmd_cat() {
     src.pop_back();
     if (!src.empty()) userInterface.cat(user.uid, src, fileName, cmd[1]);
     else userInterface.cat(user.uid, fileName, cmd[1]);
-}
-
-void Shell::cmd_vim() {
-    if (cmd.size() < 2) {
-        std::cout << "vim: missing file operand" << std::endl;
-        return;
-    }
-    if (cmd.size() > 2) {
-        std::cout << "vim: too much arguments" << std::endl;
-        return;
-    }
-
-    std::vector<std::string> src = split_path(cmd[1]);
-    if (src.empty()) {
-        std::cout << "vim: missing file operand" << std::endl;
-        return;
-    }
-    std::string fileName = src.back();
-    if (fileName.length() >= FILE_NAME_LENGTH) {
-        std::cout << "vim: too long file name" << std::endl;
-        return;
-    }
-    src.pop_back();
-    if (!src.empty()) userInterface.vim(user.uid, src, fileName, cmd[1]);
-    else userInterface.vim(user.uid, fileName, cmd[1]);
 }
 
 void Shell::cmd_mv() {
@@ -591,44 +556,44 @@ void Shell::cmd_chmod() {
     else userInterface.chmod(user.uid, dirName, cmd[2], access, cmd[1]);
 }
 
-void Shell::cmd_useradd() {
+void Shell::cmd_mkuser() {
     if (cmd.size() < 2) {
-        std::cout << "useradd: missing operand" << std::endl;
+        std::cout << "mkuser: missing operand" << std::endl;
         return;
     }
     if (cmd.size() > 2) {
-        std::cout << "useradd: too much arguments" << std::endl;
+        std::cout << "mkuser: too much arguments" << std::endl;
         return;
     }
 
     std::string name = cmd[1];
     if (name.length() >= USERNAME_PASWORD_LENGTH) {
-        std::cout << "useradd: too long user name" << std::endl;
+        std::cout << "mkuser: too long user name" << std::endl;
         return;
     }
-    userInterface.useradd(user.uid, name);
+    userInterface.mkuser(user.uid, name);
 }
 
-void Shell::cmd_userdel() {
+void Shell::cmd_rmuser() {
     if (cmd.size() < 2) {
-        std::cout << "userdel: missing operand" << std::endl;
+        std::cout << "rmuser: missing operand" << std::endl;
         return;
     }
     if (cmd.size() > 2) {
-        std::cout << "userdel: too much arguments" << std::endl;
+        std::cout << "rmuser: too much arguments" << std::endl;
         return;
     }
 
     std::string name = cmd[1];
-    userInterface.userdel(user.uid, name);
+    userInterface.rmuser(user.uid, name);
 }
 
-void Shell::cmd_userlist() {
+void Shell::cmd_lsuser() {
     if (cmd.size() > 1) {
-        std::cout << "userlist: too much arguments" << std::endl;
+        std::cout << "lsuser: too much arguments" << std::endl;
         return;
     }
-    userInterface.userlist();
+    userInterface.lsuser();
 }
 
 void Shell::cmd_passwd() {
@@ -692,12 +657,29 @@ void Shell::cmd_clear() {
     system("cls");
 }
 
-const std::vector<std::string>& Shell::getCmd() const {
-    return cmd;
-}
+void Shell::cmd_vim() {
+    if (cmd.size() < 2) {
+        std::cout << "vim: missing file operand" << std::endl;
+        return;
+    }
+    if (cmd.size() > 2) {
+        std::cout << "vim: too much arguments" << std::endl;
+        return;
+    }
 
-void Shell::setCmd(const std::vector<std::string>& cmd) {
-    Shell::cmd = cmd;
+    std::vector<std::string> src = split_path(cmd[1]);
+    if (src.empty()) {
+        std::cout << "vim: missing file operand" << std::endl;
+        return;
+    }
+    std::string fileName = src.back();
+    if (fileName.length() >= FILE_NAME_LENGTH) {
+        std::cout << "vim: too long file name" << std::endl;
+        return;
+    }
+    src.pop_back();
+    if (!src.empty()) userInterface.vim(user.uid, src, fileName, cmd[1]);
+    else userInterface.vim(user.uid, fileName, cmd[1]);
 }
 
 void Shell::outputPrefix() {
