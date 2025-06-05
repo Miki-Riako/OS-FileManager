@@ -13,6 +13,7 @@ from qfluentwidgets import FluentIcon as FIF
 from .home import Home
 from .terminal import Terminal
 from .explorer import Explorer
+from .editor import Editor
 from .about import About
 from .setting import Setting
 
@@ -36,7 +37,7 @@ class GUI(FluentWindow):
         self.homeInterface     = Home("Home Interface", self)
         self.terminalInterface = Terminal('Terminal Interface', self)
         self.explorerInterface = Explorer('Explorer Interface', self.terminalInterface, self)
-        # self.helperInterface   = Helper('Helper Interface', self)
+        self.editor   = Editor('Editor Interface', self)
         self.aboutInterface    = About('About Interface', self)
         self.settingInterface  = Setting('Setting Interface', self)
 
@@ -45,9 +46,9 @@ class GUI(FluentWindow):
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, '主页 Home')
-        self.addSubInterface(self.terminalInterface, FIF.DEVELOPER_TOOLS, '终端管理器 Teriminal Manager')
-        self.addSubInterface(self.explorerInterface, FIF.APPLICATION, '资源管理器 File Explorer')
-        # self.addSubInterface(self.helperInterface, FIF.BOOK_SHELF, '帮助文档 Helper Document')
+        self.addSubInterface(self.terminalInterface, FIF.CONNECT, '终端管理器 Teriminal Manager')
+        self.addSubInterface(self.explorerInterface, FIF.CALENDAR, '资源管理器 File Explorer')
+        self.addSubInterface(self.editor, FIF.EDIT, '文本编辑器 Editor')
 
         self.addSubInterface(self.aboutInterface, FIF.PEOPLE, '关于 About', NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.settingInterface, FIF.SETTING, '设置 Settings', NavigationItemPosition.BOTTOM)
