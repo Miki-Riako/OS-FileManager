@@ -1,8 +1,7 @@
 #include "CommandLineInterface.h"
 
 void CommandLineInterface::initialize() {
-    //如果挂载失败,先格式化
-    if (!fileSystem.mount()) {
+    if (!fileSystem.mount()) { //如果挂载失败,先格式化
         std::cout << "mount failed!" << std::endl << "begin format!" << std::endl;
         //如果格式化失败,创建新磁盘
         if (!fileSystem.format(BLOCK_BYTE)) {
@@ -25,16 +24,14 @@ void CommandLineInterface::initialize() {
 
 bool CommandLineInterface::logout() {
     uint32_t root_disk = fileSystem.getRootLocation();
-    //根节点
-    INode rootInode{};
+    INode rootInode{}; //根节点
     //从根节点所在磁盘块读入根节点信息
     fileSystem.read(root_disk, 0, reinterpret_cast<char*>(&rootInode), sizeof(rootInode));
     //将根目录信息写入当前目录
     fileSystem.read(rootInode.bno, 0, reinterpret_cast<char*> (&directory), sizeof(directory));
     nowDiretoryDisk = rootInode.bno;
 
-    //更新信息
-    fileSystem.update();
+    fileSystem.update(); //更新信息
     return true;
 }
 
@@ -48,8 +45,7 @@ std::pair<bool, int> CommandLineInterface::cd(uint8_t uid, std::string directory
             //确保是目录名
             if (judge(directory.item[i].inodeIndex)) {
                 dirLocation = i;
-            }
-            else {
+            } else {
                 dirLocation = -2;
             }
             break;
@@ -69,8 +65,7 @@ std::pair<bool, int> CommandLineInterface::cd(uint8_t uid, std::string directory
         return {false, 1};
     }
 
-    //获取指向需要进入的目录的i结点
-    uint32_t diretoryInodeDisk = directory.item[dirLocation].inodeIndex;
+    uint32_t diretoryInodeDisk = directory.item[dirLocation].inodeIndex; //获取指向需要进入的目录的i结点
     INode iNode{};
     fileSystem.read(diretoryInodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
 
@@ -81,8 +76,7 @@ std::pair<bool, int> CommandLineInterface::cd(uint8_t uid, std::string directory
         return {false, 2};
     }
 
-    //设置新的当前目录
-    nowDiretoryDisk = iNode.bno;
+    nowDiretoryDisk = iNode.bno; //设置新的当前目录
     fileSystem.read(iNode.bno, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
     return {true, 0};
 }
@@ -92,10 +86,9 @@ bool CommandLineInterface::ls(uint8_t uid, bool all, const std::string& initCmd)
     fileSystem.read(directory.item[0].inodeIndex, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (!checkReadAccess(uid, iNode)) {
         if (initCmd.empty()) {
-            std::cout << currentCmd << ": " << "cannot " << "open directory: Permission denied" << std::endl;
-        }
-        else {
-            std::cout << currentCmd << ": " << "cannot " << "open directory '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot open directory: Permission denied" << std::endl;
+        } else {
+            std::cout << currentCmd << ": cannot open directory '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -129,12 +122,10 @@ bool CommandLineInterface::ls(uint8_t uid, bool all, const std::string& initCmd)
             std::cout << " | ";
             std::cout << iNode.creationTime << " | ";
             std::cout << iNode.modifiedTime << std::endl;
-        }
-        else {
+        } else {
             if (judge(directory.item[i].inodeIndex)) {
                 std::cout  << directory.item[i].name << "\t";
-            }
-            else {
+            } else {
                 std::cout << directory.item[i].name << "\t";
             }
         }
@@ -149,10 +140,9 @@ bool CommandLineInterface::ls(uint8_t uid, bool all, std::vector<std::string> sr
     auto findRes = findDisk(uid, src);
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
-            std::cout << currentCmd << ": " << "cannot " << "open directory '" << initCmd << "': No such directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
-            std::cout << currentCmd << ": " << "cannot " << "open directory '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot open directory '" << initCmd << "': No such directory" << std::endl;
+        } else if (findRes.second == 2) {
+            std::cout << currentCmd << ": cannot open directory '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -164,11 +154,11 @@ bool CommandLineInterface::ls(uint8_t uid, bool all, std::vector<std::string> sr
     INode iNode{};
     fileSystem.read(inodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (iNode.flag >> 6 != 1) {
-        std::cout << currentCmd << ": " << "cannot " << "open directory '" << initCmd << "': Not a directory" << std::endl;
+        std::cout << currentCmd << ": cannot open directory '" << initCmd << "': Not a directory" << std::endl;
         return false;
     }
     if (!checkReadAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "open directory '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot open directory '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
     tmpDirDisk = iNode.bno;
@@ -185,34 +175,28 @@ bool CommandLineInterface::touch(uint8_t uid, std::string fileName, const std::s
     INode iNode{};
     fileSystem.read(directory.item[0].inodeIndex, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (!checkWriteAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot touch '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
 
     int directoryIndex = -1;
-    //遍历所有目录项,找到空闲目录项
-    for (int i = 0; i < DIRECTORY_NUMS; i++) {
+    for (int i = 0; i < DIRECTORY_NUMS; i++) { //遍历所有目录项,找到空闲目录项
         if (directory.item[i].inodeIndex == 0) {
             directoryIndex = i;
             break;
         }
     }
-    //目录项满了
-    if (directoryIndex == -1) {
-        std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': No space left on device" << std::endl;
+    if (directoryIndex == -1) { //目录项满了
+        std::cout << currentCmd << ": cannot touch '" << initCmd << "': No space left on device" << std::endl;
         return false;
     }
-
     //重复文件检测
     if (duplicateDetection(fileName)) {
-        std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': File exists" << std::endl;
+        std::cout << currentCmd << ": cannot touch '" << initCmd << "': File exists" << std::endl;
         return false;
     }
-
-    //给新文件的i结点分配空闲磁盘块
-    uint32_t fileInodeDisk = fileSystem.blockAllocate();
-    //给文件索引表分配空闲磁盘块
-    uint32_t fileIndexDisk = fileSystem.blockAllocate();
+    uint32_t fileInodeDisk = fileSystem.blockAllocate(); //给新文件的i结点分配空闲磁盘块
+    uint32_t fileIndexDisk = fileSystem.blockAllocate(); //给文件索引表分配空闲磁盘块
 
     FileIndex fileIndex{};
     //给文件分配空闲磁盘块
@@ -223,8 +207,7 @@ bool CommandLineInterface::touch(uint8_t uid, std::string fileName, const std::s
     //把文件索引表写入磁盘
     fileSystem.write(fileIndexDisk, 0, reinterpret_cast<char*>(&fileIndex), sizeof(fileIndex));
 
-    //新文件i节点
-    INode fileInode{};
+    INode fileInode{}; //新文件i节点
     fileInode.bno = fileIndexDisk;
     fileInode.flag = 0x34; //00 110 100b
     //fileInode.flag = 0x20; //00 100 000b
@@ -233,8 +216,7 @@ bool CommandLineInterface::touch(uint8_t uid, std::string fileName, const std::s
     strcpy(fileInode.modifiedTime, fileInode.creationTime);
     fileSystem.write(fileInodeDisk, 0, reinterpret_cast<char*>(&fileInode), sizeof(fileInode));
 
-    //更新目录项信息
-    strcpy(directory.item[directoryIndex].name, fileName.c_str());
+    strcpy(directory.item[directoryIndex].name, fileName.c_str()); //更新目录项信息
     directory.item[directoryIndex].inodeIndex = fileInodeDisk;
     if (directoryIndex + 1 < DIRECTORY_NUMS) {
         directory.item[directoryIndex + 1].inodeIndex = 0;
@@ -253,10 +235,9 @@ bool CommandLineInterface::touch(uint8_t uid, std::vector<std::string> src, std:
     auto findRes = findDisk(uid, src);
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
-            std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': No such file or directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
-            std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot touch '" << initCmd << "': No such file or directory" << std::endl;
+        } else if (findRes.second == 2) {
+            std::cout << currentCmd << ": cannot touch '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -268,11 +249,11 @@ bool CommandLineInterface::touch(uint8_t uid, std::vector<std::string> src, std:
     INode iNode{};
     fileSystem.read(inodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (iNode.flag >> 6 != 1) {
-        std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': No such file or directory" << std::endl;
+        std::cout << currentCmd << ": cannot touch '" << initCmd << "': No such file or directory" << std::endl;
         return false;
     }
     if (!checkReadAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "touch '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot touch '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
     tmpDirDisk = iNode.bno;
@@ -294,8 +275,7 @@ bool CommandLineInterface::cat(uint8_t uid, std::string fileName, const std::str
         if (!strcmp(directory.item[i].name, fileName.c_str())) {
             if (!judge(directory.item[i].inodeIndex)) {
                 fileLocation = i;
-            }
-            else {
+            } else {
                 fileLocation = -2;
             }
             break;
@@ -322,8 +302,7 @@ bool CommandLineInterface::cat(uint8_t uid, std::string fileName, const std::str
         std::get<0>(*returnContent) = true;
         std::get<1>(*returnContent) = content;
         std::get<2>(*returnContent) = iNode.creationTime;
-    }
-    else {
+    } else {
         std::cout << content << std::endl;
     }
     return true;
@@ -334,8 +313,7 @@ bool CommandLineInterface::cat(uint8_t uid, std::vector<std::string> src, std::s
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
             std::cout << currentCmd << ": " << initCmd << ": No such file or directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
+        } else if (findRes.second == 2) {
             std::cout << currentCmd << ": " << initCmd << ": Permission denied" << std::endl;
         }
         return false;
@@ -431,7 +409,7 @@ bool CommandLineInterface::vim(uint8_t uid, std::string fileName, const std::str
                 std::cout << currentCmd << ": cannot " << (currentCmd == "mv" ? "move" : "copy") << " to '" << initCmd << "': Permission denied" << std::endl;
             }
             return false;
-            // std::cout << currentCmd << ": " << "cannot " << (currentCmd == "mv" ? "move" : "copy") << " to '" << initCmd << "': Permission denied" << std::endl;
+            // std::cout << currentCmd << ": cannot " << (currentCmd == "mv" ? "move" : "copy") << " to '" << initCmd << "': Permission denied" << std::endl;
             // return false;
         }
         uint32_t newFileIndexDisk = writeFile(std::get<1>(*inputContent));
@@ -451,8 +429,7 @@ bool CommandLineInterface::vim(uint8_t uid, std::vector<std::string> src, std::s
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
             std::cout << currentCmd << ": " << initCmd << ": No such file or directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
+        } else if (findRes.second == 2) {
             std::cout << currentCmd << ": " << initCmd << ": Permission denied" << std::endl;
         }
         return false;
@@ -493,8 +470,7 @@ bool CommandLineInterface::mv(uint8_t uid, std::vector<std::string> src, std::ve
         if (!rm(uid, src, srcName, initSrc)) {
             return false;
         }
-    }
-    else {
+    } else {
         if (!rm(uid, srcName, initSrc)) {
             return false;
         }
@@ -510,8 +486,7 @@ bool CommandLineInterface::cp(uint8_t uid, std::vector<std::string> src, std::ve
     src.pop_back();
     if (!src.empty()) {
         cat(uid, src, srcName, initSrc, &content);
-    }
-    else {
+    } else {
         cat(uid, srcName, initSrc, &content);
     }
     if (!std::get<0>(content)) {
@@ -523,8 +498,7 @@ bool CommandLineInterface::cp(uint8_t uid, std::vector<std::string> src, std::ve
     des.pop_back();
     if (!des.empty()) {
         vim(uid, des, desName, initDes, &content);
-    }
-    else {
+    } else {
         vim(uid, desName, initDes, &content);
     }
     if (!std::get<0>(content)) {
@@ -543,19 +517,18 @@ bool CommandLineInterface::rm(uint8_t uid, std::string fileName, const std::stri
         if (!strcmp(directory.item[i].name, fileName.c_str())) {
             if (!judge(directory.item[i].inodeIndex)) {
                 fileLocation = i;
-            }
-            else {
+            } else {
                 fileLocation = -2;
             }
             break;
         }
     }
     if (fileLocation == -1) {
-        std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': No such file" << std::endl;
+        std::cout << currentCmd << ": cannot remove '" << initCmd << "': No such file" << std::endl;
         return false;
     }
     if (fileLocation == -2) {
-        std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': Not a file" << std::endl;
+        std::cout << currentCmd << ": cannot remove '" << initCmd << "': Not a file" << std::endl;
         return false;
     }
 
@@ -563,7 +536,7 @@ bool CommandLineInterface::rm(uint8_t uid, std::string fileName, const std::stri
     INode fileIndexInode{};
     fileSystem.read(directory.item[fileLocation].inodeIndex, 0, reinterpret_cast<char*>(&fileIndexInode), sizeof(fileIndexInode));
     if (!checkWriteAccess(uid, fileIndexInode)) {
-        std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot remove '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
 
@@ -582,10 +555,9 @@ bool CommandLineInterface::rm(uint8_t uid, std::vector<std::string> src, std::st
     auto findRes = findDisk(uid, src);
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
-            std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': No such file or directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
-            std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot remove '" << initCmd << "': No such file or directory" << std::endl;
+        } else if (findRes.second == 2) {
+            std::cout << currentCmd << ": cannot remove '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -597,11 +569,11 @@ bool CommandLineInterface::rm(uint8_t uid, std::vector<std::string> src, std::st
     INode iNode{};
     fileSystem.read(inodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (iNode.flag >> 6 != 1) {
-        std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': No such file or directory" << std::endl;
+        std::cout << currentCmd << ": cannot remove '" << initCmd << "': No such file or directory" << std::endl;
         return false;
     }
     if (!checkReadAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "remove '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot remove '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
     tmpDirDisk = iNode.bno;
@@ -618,27 +590,24 @@ bool CommandLineInterface::mkdir(uint8_t uid, std::string directoryName, const s
     INode iNode{};
     fileSystem.read(directory.item[0].inodeIndex, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (!checkWriteAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot create directory '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
 
     int directoryIndex = -1;
-    //遍历所有目录项,找到空闲目录项
-    for (int i = 0; i < DIRECTORY_NUMS; i++) {
+    for (int i = 0; i < DIRECTORY_NUMS; i++) { //遍历所有目录项,找到空闲目录项
         if (directory.item[i].inodeIndex == 0) {
             directoryIndex = i;
             break;
         }
     }
-    //目录项满了
-    if (directoryIndex == -1) {
-        std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': No space left on device" << std::endl;
+    if (directoryIndex == -1) { //目录项满了
+        std::cout << currentCmd << ": cannot create directory '" << initCmd << "': No space left on device" << std::endl;
         return false;
     }
 
-    //重复文件检测
-    if (duplicateDetection(directoryName)) {
-        std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': File exists" << std::endl;
+    if (duplicateDetection(directoryName)) { //重复文件检测
+        std::cout << currentCmd << ": cannot create directory '" << initCmd << "': File exists" << std::endl;
         return false;
     }
 
@@ -680,8 +649,7 @@ bool CommandLineInterface::mkdir(uint8_t uid, std::string directoryName, const s
     //将更新后的当前目录信息写入磁盘
     fileSystem.write(nowDiretoryDisk, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
 
-    //更新已分配磁盘块
-    fileSystem.update();
+    fileSystem.update(); //更新已分配磁盘块
     return true;
 }
 
@@ -689,10 +657,9 @@ bool CommandLineInterface::mkdir(uint8_t uid, std::vector<std::string> src, std:
     auto findRes = findDisk(uid, src);
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
-            std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': No such directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
-            std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot create directory '" << initCmd << "': No such directory" << std::endl;
+        } else if (findRes.second == 2) {
+            std::cout << currentCmd << ": cannot create directory '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -704,11 +671,11 @@ bool CommandLineInterface::mkdir(uint8_t uid, std::vector<std::string> src, std:
     INode iNode{};
     fileSystem.read(inodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (iNode.flag >> 6 != 1) {
-        std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': Not a directory" << std::endl;
+        std::cout << currentCmd << ": cannot create directory '" << initCmd << "': Not a directory" << std::endl;
         return false;
     }
     if (!checkReadAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "create directory '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot create directory '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
     tmpDirDisk = iNode.bno;
@@ -731,19 +698,18 @@ bool CommandLineInterface::rmdir(uint8_t uid, std::string dirName, const std::st
         if (!strcmp(directory.item[i].name, dirName.c_str())) {
             if (judge(directory.item[i].inodeIndex)) {
                 dirLocation = i;
-            }
-            else {
+            } else {
                 dirLocation = -2;
             }
             break;
         }
     }
     if (dirLocation == -1) {
-        std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': No such directory" << std::endl;
+        std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': No such directory" << std::endl;
         return false;
     }
     if (dirLocation == -2) {
-        std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': Not a directory" << std::endl;
+        std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': Not a directory" << std::endl;
         return false;
     }
 
@@ -753,7 +719,7 @@ bool CommandLineInterface::rmdir(uint8_t uid, std::string dirName, const std::st
     INode dirInode1{};
     fileSystem.read(directory.item[dirLocation].inodeIndex, 0, reinterpret_cast<char*>(&dirInode1), sizeof(dirInode1));
     if (!checkWriteAccess(uid, dirInode1)) {
-        std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
 
@@ -770,8 +736,7 @@ bool CommandLineInterface::rmdir(uint8_t uid, std::string dirName, const std::st
                 return false;
             }
             i--;
-        }
-        else if (strcmp(directory.item[i].name, ".") != 0 && strcmp(directory.item[i].name, "..") != 0) {
+        } else if (strcmp(directory.item[i].name, ".") != 0 && strcmp(directory.item[i].name, "..") != 0) {
             //目录
             if (!rmdir(uid, directory.item[i].name, initCmd)) {
                 fileSystem.read(nowDisk, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
@@ -781,7 +746,6 @@ bool CommandLineInterface::rmdir(uint8_t uid, std::string dirName, const std::st
             i--;
         }
     }
-
     //重置当前目录
     fileSystem.read(nowDisk, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
     nowDiretoryDisk = nowDisk;
@@ -800,10 +764,9 @@ bool CommandLineInterface::rmdir(uint8_t uid, std::vector<std::string> src, std:
     auto findRes = findDisk(uid, src);
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
-            std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': No such directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
-            std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': No such directory" << std::endl;
+        } else if (findRes.second == 2) {
+            std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -815,11 +778,11 @@ bool CommandLineInterface::rmdir(uint8_t uid, std::vector<std::string> src, std:
     INode iNode{};
     fileSystem.read(inodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (iNode.flag >> 6 != 1) {
-        std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': Not a directory" << std::endl;
+        std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': Not a directory" << std::endl;
         return false;
     }
     if (!checkReadAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "remove directory '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot remove directory '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
     tmpDirDisk = iNode.bno;
@@ -854,14 +817,14 @@ bool CommandLineInterface::chmod(uint8_t uid, std::string name, std::string who,
         }
     }
     if (location == -1) {
-        std::cout << currentCmd << ": " << "cannot " << "access '" << initCmd << "': No such file or directory" << std::endl;
+        std::cout << currentCmd << ": cannot access '" << initCmd << "': No such file or directory" << std::endl;
         return false;
     }
 
     INode iNode{};
     fileSystem.read(directory.item[location].inodeIndex, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (!checkOwnerAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "access '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot access '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
 
@@ -869,12 +832,10 @@ bool CommandLineInterface::chmod(uint8_t uid, std::string name, std::string who,
     if (who == "-a") {
         iNode.flag &= 0xc0; //11 000 000
         mask = 0x3f; //00 111 111
-    }
-    else if (who == "-t") {
+    } else if (who == "-t") {
         iNode.flag &= 0xc7; //11 000 111
         mask = 0x38; //00 111 000
-    }
-    else {
+    } else {
         iNode.flag &= 0xf8; //11 111 000
         mask = 0x07; //00 000 111
     }
@@ -900,10 +861,9 @@ bool CommandLineInterface::chmod(uint8_t uid, std::vector<std::string> src, std:
     auto findRes = findDisk(uid, src);
     if (findRes.first == -1) {
         if (findRes.second == 0 || findRes.second == 1) {
-            std::cout << currentCmd << ": " << "cannot " << "access '" << initCmd << "': No such file or directory" << std::endl;
-        }
-        else if (findRes.second == 2) {
-            std::cout << currentCmd << ": " << "cannot " << "access '" << initCmd << "': Permission denied" << std::endl;
+            std::cout << currentCmd << ": cannot access '" << initCmd << "': No such file or directory" << std::endl;
+        } else if (findRes.second == 2) {
+            std::cout << currentCmd << ": cannot access '" << initCmd << "': Permission denied" << std::endl;
         }
         return false;
     }
@@ -915,11 +875,11 @@ bool CommandLineInterface::chmod(uint8_t uid, std::vector<std::string> src, std:
     INode iNode{};
     fileSystem.read(inodeDisk, 0, reinterpret_cast<char*>(&iNode), sizeof(iNode));
     if (iNode.flag >> 6 != 1) {
-        std::cout << currentCmd << ": " << "cannot " << "access '" << initCmd << "': No such file or directory" << std::endl;
+        std::cout << currentCmd << ": cannot access '" << initCmd << "': No such file or directory" << std::endl;
         return false;
     }
     if (!checkReadAccess(uid, iNode)) {
-        std::cout << currentCmd << ": " << "cannot " << "access '" << initCmd << "': Permission denied" << std::endl;
+        std::cout << currentCmd << ": cannot access '" << initCmd << "': Permission denied" << std::endl;
         return false;
     }
     tmpDirDisk = iNode.bno;
@@ -955,7 +915,7 @@ bool CommandLineInterface::mkuser(uint8_t uid, std::string name) {
     std::cin.ignore();
     if (passwd != confirm) {
         std::cout << "Sorry, passwords do not match." << std::endl;
-        std::cout << currentCmd << ": " << "failed " << "preliminary check by password service" << std::endl;
+        std::cout << currentCmd << ": failed preliminary check by password service" << std::endl;
         return false;
     }
     if (passwd.length() >= USERNAME_PASWORD_LENGTH) {
@@ -979,7 +939,7 @@ bool CommandLineInterface::rmuser(uint8_t uid, std::string name) {
         return false;
     }
     if (delUid == 1) {
-        std::cout << currentCmd << ": " << "cannot " << "delete user 'root'" << std::endl;
+        std::cout << currentCmd << ": cannot delete user 'root'" << std::endl;
         return false;
     }
 
@@ -1011,14 +971,12 @@ bool CommandLineInterface::lsuser() {
             }
             if (first) {
                 std::cout << ", ";
-            }
-            else {
+            } else {
                 first = true;
             }
             if (i == j) {
                 std::cout  << user[j].name;
-            }
-            else {
+            } else {
                 std::cout << user[j].name;
             }
         }
@@ -1053,7 +1011,7 @@ bool CommandLineInterface::passwd(uint8_t uid, std::string name) {
     std::cin.ignore();
     if (passwd != confirm) {
         std::cout << "Sorry, passwords do not match." << std::endl;
-        std::cout << currentCmd << ": " << "failed " << "preliminary check by password service" << std::endl;
+        std::cout << currentCmd << ": failed preliminary check by password service" << std::endl;
         return false;
     }
     if (passwd.length() >= USERNAME_PASWORD_LENGTH) {
@@ -1089,7 +1047,7 @@ bool CommandLineInterface::distrust(uint8_t uid, std::string currentUser, std::s
         return false;
     }
     if (fileSystem.duplicateDetection(targetUser) == uid) {
-        std::cout << currentCmd << ": " << "cannot " << "distrust yourself" << std::endl;
+        std::cout << currentCmd << ": cannot distrust yourself" << std::endl;
         return false;
     }
     if (!fileSystem.revokeTrustUser(currentUser, targetUser)) {
@@ -1128,27 +1086,19 @@ void CommandLineInterface::setCurrentCmd(const std::string& cmd) {
 }
 
 std::pair<uint32_t, int> CommandLineInterface::findDisk(uint8_t uid, std::vector<std::string> src) {
-    //获取名
-    std::string srcName = src.back();
+    std::string srcName = src.back(); //获取名
     src.pop_back();
     uint32_t tmpDirectoryDisk = nowDiretoryDisk;
     int error = 0; //能否找到目录
     std::string dirName; //输出错误信息用
-    //在此次直接调用cd函数来寻找
-    for (std::string& item : src) {
-        if (item == "") {
-            //空，直接寻找根目录
+    for (std::string& item : src) { //在此次直接调用cd函数来寻找
+        if (item == "") { //空，直接寻找根目录
             goToRoot();
-        }
-        else if (item == ".") {
-            //当前
+        } else if (item == ".") { //当前
             continue;
-        }
-        else if (item == "..") {
-            //上级
+        } else if (item == "..") { //上级
             error = cd(uid, item).second;
-        }
-        else {
+        } else {
             error = cd(uid, item).second;
         }
         if (error) {
@@ -1157,15 +1107,14 @@ std::pair<uint32_t, int> CommandLineInterface::findDisk(uint8_t uid, std::vector
         }
     }
     if (error) {
-        //std::cout << "failed: " << "'" << dirName << "' No such directory" << std::endl;
+        //std::cout << "failed: '" << dirName << "' No such directory" << std::endl;
         //还原现场
         nowDiretoryDisk = tmpDirectoryDisk;
         fileSystem.read(nowDiretoryDisk, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
         return std::make_pair(-1, error);
     }
     int location = -1;
-    if (srcName != "") {
-        //找到对应i结点
+    if (srcName != "") { //找到对应i结点
         for (int i = 0; i < DIRECTORY_NUMS; i++) {
             if (!directory.item[i].inodeIndex) break;
             if (!strcmp(directory.item[i].name, srcName.c_str())) {
@@ -1174,21 +1123,18 @@ std::pair<uint32_t, int> CommandLineInterface::findDisk(uint8_t uid, std::vector
             }
         }
         if (location == -1) {
-            //std::cout << "failed " << "'" << srcName << "' No such directory or file" << std::endl;
+            //std::cout << "failed '" << srcName << "' No such directory or file" << std::endl;
             //还原现场
             nowDiretoryDisk = tmpDirectoryDisk;
             fileSystem.read(nowDiretoryDisk, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
             return std::make_pair(-1, 0);
         }
-    }
-    else {
+    } else {
         goToRoot();
         location = 0;
     }
-    //记录下需要返回的数据
-    std::pair<uint32_t, int> ret = std::make_pair(nowDiretoryDisk, location);
-    //还原现场
-    nowDiretoryDisk = tmpDirectoryDisk;
+    std::pair<uint32_t, int> ret = std::make_pair(nowDiretoryDisk, location); //记录下需要返回的数据
+    nowDiretoryDisk = tmpDirectoryDisk; //还原现场
     fileSystem.read(nowDiretoryDisk, 0, reinterpret_cast<char*>(&directory), sizeof(directory));
     return ret;
 }
@@ -1267,7 +1213,9 @@ uint32_t CommandLineInterface::freeFileBlock(uint32_t disk) {
 void CommandLineInterface::freeFile(uint32_t startDisk) {
     //循环删除,直到没有下一个索引
     uint32_t next = freeFileBlock(startDisk);
-    while (next) next = freeFileBlock(next);
+    while (next) {
+        next = freeFileBlock(next);
+    }
 }
 
 void CommandLineInterface::wholeDirItemsMove(int itemLocation) {
@@ -1307,12 +1255,9 @@ bool CommandLineInterface::checkReadAccess(uint8_t uid, INode tar) {
         return true;
     }
     if (fileSystem.verifyTrustUser(tar.uid, uid)) {
-        //xx 1/0xx xxx
-        return (tar.flag >> 5) & 1;
-    }
-    else {
-        //xx xxx 1/0xx
-        return (tar.flag >> 2) & 1;
+        return (tar.flag >> 5) & 1; //xx 1/0xx xxx
+    } else {
+        return (tar.flag >> 2) & 1; //xx xxx 1/0xx
     }
 }
 
@@ -1324,23 +1269,18 @@ bool CommandLineInterface::checkWriteAccess(uint8_t uid, INode tar) {
         return true;
     }
     if (fileSystem.verifyTrustUser(tar.uid, uid)) {
-        //xx x1/0x xxx
-        return (tar.flag >> 4) & 1;
-    }
-    else {
-        //xx xxx x1/0x
-        return (tar.flag >> 1) & 1;
+        return (tar.flag >> 4) & 1; //xx x1/0x xxx
+    } else {
+        return (tar.flag >> 1) & 1; //xx xxx x1/0x
     }
 }
 
 bool CommandLineInterface::checkOwnerAccess(uint8_t uid, INode tar) {
     if (!tar.uid) {
         return false;
-    }
-    else if (uid == tar.uid || sudoMode) {
+    } else if (uid == tar.uid || sudoMode) {
         return true;
-    }
-    else {
+    } else {
         return false;
     }
 }

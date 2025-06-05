@@ -5,10 +5,8 @@
 #include <cstdint>
 #include <cstring>
 #include "DiskManager.h"
-#include "./entity/FileSystemCoreInfo.h" //超级块对象
-#include "./entity/INode.h" //i节点:存放文件说明信息
-#include "./entity/Directory.h" //目录项和类
-#include "./entity/FreeBlockStack.h" //空闲块
+#include "include/Data.h"
+#include "model/FreeBlockStack.h" //空闲块
 
 //基本文件系统，实现对于文件的管理
 class FileSystemCore {

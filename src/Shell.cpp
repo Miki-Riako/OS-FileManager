@@ -4,7 +4,6 @@ Shell::Shell() {
     user.uid = 0;
     isExit = false;
 
-    //help["Command"] = "Usage               Interpret";
     help["touch"]    = "touch <FILE>                     touch file timestamps";
     help["cat"]      = "cat <FILE>                       concatenate and display files";
     help["echo"]     = "echo <STRING> [>|>> <FILE>]      display a line of text or redirect output";
@@ -108,7 +107,7 @@ void Shell::exec() {
     std::tie(valid, cmd) = split_cmd(input);
 
     if (!valid) {
-        std::cout << "syntax error:" << " missing terminating \" character" << std::endl;
+        std::cout << "syntax error: missing terminating \" character" << std::endl;
         return;
     }
     if (cmd.empty()) {
@@ -188,8 +187,6 @@ void Shell::exec() {
 }
 
 void Shell::cmd_login() {
-    bool debug = true;
-
     std::string userName;
     std::string password;
     cmd_clear();
@@ -208,7 +205,7 @@ void Shell::cmd_login() {
         uint8_t uid = userInterface.userVerify(userName, password);
         if (uid == 0) {
             cmd_clear();
-            std::cout << "Access denied. " << "Please check username or password." << std::endl;
+            std::cout << "Access denied. Please check username or password." << std::endl;
         }
         else {
             userInterface.getUser(uid, &user);
@@ -495,7 +492,7 @@ bool Shell::cmd_sudo() {
 
     uint8_t checkUid = userInterface.userVerify(user.name, password);
     if (!checkUid) {
-        std::cout << "Password verification " << "failed" << std::endl;
+        std::cout << "Password verification failed" << std::endl;
         return false;
     }
     else if (checkUid != user.uid) {
@@ -536,7 +533,7 @@ void Shell::cmd_chmod() {
         return;
     }
     if (cmd[2] != "-a" && cmd[2] != "-t" && cmd[2] != "-o") {
-        std::cout << "chmod: " << "invalid " << "mode: '" << cmd[2] << "'" << std::endl;
+        std::cout << "chmod: invalid mode: '" << cmd[2] << "'" << std::endl;
         return;
     }
     std::string access(3, '-');
@@ -555,7 +552,7 @@ void Shell::cmd_chmod() {
             tmp.erase(tmp.find('x'), 1);
         }
         if (!tmp.empty()) {
-            std::cout << "chmod: " << "invalid " << "access: '" << cmd[3] << "'" << std::endl;
+            std::cout << "chmod: invalid access: '" << cmd[3] << "'" << std::endl;
             return;
         }
     }
@@ -770,7 +767,7 @@ void Shell::cmd_vim() {
 }
 
 void Shell::outputPrefix() {
-    std::cout << "OSFileSystem@" << user.name << ":" << "~";
+    std::cout << "OSFileSystem@" << user.name << ":~";
     for (const auto& s : curPath) {
         std::cout << "/" << s;
     }

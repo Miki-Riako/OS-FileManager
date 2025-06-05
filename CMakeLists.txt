@@ -11,13 +11,9 @@ add_executable(app
         src/CommandLineInterface.cpp src/CommandLineInterface.h
         src/Shell.cpp src/Shell.h
 
-        src/Constraints.h
+        src/include/Constraints.h
+        src/include/Data.h
 
-        src/entity/FreeBlockStack.h src/entity/FreeBlockStack.cpp
-        src/entity/Vim.h src/entity/Vim.cpp
-
-        src/entity/Directory.h
-        src/entity/FileSystemCoreInfo.h
-        src/entity/FileIndex.h
-        src/entity/INode.h
-        src/entity/User.h)
+        src/model/FreeBlockStack.h src/model/FreeBlockStack.cpp
+        src/model/Vim.h src/model/Vim.cpp
+)

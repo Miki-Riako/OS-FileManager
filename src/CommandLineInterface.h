@@ -7,9 +7,9 @@
 #include <vector>
 
 #include "FileSystemCore.h"
-#include "Constraints.h"
-#include "./entity/FileIndex.h"
-#include "./entity/Vim.h"
+#include "./include/Constraints.h"
+#include "./include/Data.h"
+#include "./model/Vim.h"
 
 // 为用户提供的接口，支持用户常用的功能
 class CommandLineInterface {
@@ -26,8 +26,6 @@ public:
     bool touch(uint8_t uid, std::vector<std::string> src, std::string fileName, const std::string& initCmd); //touch命令接口,根据src路径创建文件
     bool cat(uint8_t uid, std::string fileName, const std::string& initCmd, std::tuple<bool, std::string, std::string>* returnContent = nullptr); //cat命令接口,打印文件
     bool cat(uint8_t uid, std::vector<std::string> src, std::string fileName, const std::string& initCmd, std::tuple<bool, std::string, std::string>* returnContent = nullptr); //cat命令接口,根据src路径打印文件
-    bool vim(uint8_t uid, std::string fileName, const std::string& initCmd, std::tuple<bool, std::string, std::string>* inputContent = nullptr); //vim命令接口,编辑文件
-    bool vim(uint8_t uid, std::vector<std::string> src, std::string fileName, const std::string& initCmd, std::tuple<bool, std::string, std::string>* inputContent = nullptr); //vim命令接口,根据src路径编辑文件
 
     bool mv(uint8_t uid, std::vector<std::string> src, std::vector<std::string> des, const std::string& initSrc, const std::string& initDes); //mv命令接口,移动文件
     bool cp(uint8_t uid, std::vector<std::string> src, std::vector<std::string> des, const std::string& initSrc, const std::string& initDes); //cp命令接口,复制文件
@@ -49,6 +47,9 @@ public:
     bool passwd(uint8_t uid, std::string name); //passwd命令接口，修改当前用户密码
     bool trust(uint8_t uid, std::string currentUser, std::string targetUser); //trust命令接口，添加当前用户的信任用户
     bool distrust(uint8_t uid, std::string currentUser, std::string targetUser); //distrust命令接口，删除当前用户的信任用户
+
+    bool vim(uint8_t uid, std::string fileName, const std::string& initCmd, std::tuple<bool, std::string, std::string>* inputContent = nullptr); //vim命令接口,编辑文件
+    bool vim(uint8_t uid, std::vector<std::string> src, std::string fileName, const std::string& initCmd, std::tuple<bool, std::string, std::string>* inputContent = nullptr); //vim命令接口,根据src路径编辑文件
 
     void updateDirNow(); //更新当前目录信息
 

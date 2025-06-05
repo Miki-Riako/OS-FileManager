@@ -9,10 +9,11 @@
 #include <vector>
 
 #include "CommandLineInterface.h"
-#include "entity/User.h"
+#include "include/Data.h"
 
 class Shell {
 public:
+    bool debug = true;
     Shell();
 
     //根据part分割str
