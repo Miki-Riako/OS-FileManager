@@ -12,7 +12,6 @@ add_executable(app
         src/Shell.cpp src/Shell.h
 
         src/Constraints.h
-        src/Tools.h
 
         src/entity/FreeBlockStack.h src/entity/FreeBlockStack.cpp
         src/entity/Vim.h src/entity/Vim.cpp

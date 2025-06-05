@@ -7,6 +7,7 @@ Shell::Shell() {
     //help["Command"] = "Usage               Interpret";
     help["touch"]    = "touch <FILE>                     touch file timestamps";
     help["cat"]      = "cat <FILE>                       concatenate and display files";
+    help["echo"]     = "echo <STRING> [>|>> <FILE>]      display a line of text or redirect output";
     help["rm"]       = "rm <FILE>                        remove files";
     help["rmdir"]    = "rmdir <DIR>                      remove directories";
     help["mkdir"]    = "mkdir <DIR>                      make directories";
@@ -147,6 +148,8 @@ void Shell::exec() {
         cmd_cp();
     } else if (cmdType == "distrust") {
         cmd_distrust();
+    } else if (cmdType == "echo") {
+        cmd_echo();
     } else if (cmdType == "exit") {
         cmd_exit();
     } else if (cmdType == "format") {
@@ -492,7 +495,7 @@ bool Shell::cmd_sudo() {
 
     uint8_t checkUid = userInterface.userVerify(user.name, password);
     if (!checkUid) {
-        std::cout << "Password verification " << RED << "failed" << RESET << std::endl;
+        std::cout << "Password verification " << "failed" << std::endl;
         return false;
     }
     else if (checkUid != user.uid) {
@@ -533,7 +536,7 @@ void Shell::cmd_chmod() {
         return;
     }
     if (cmd[2] != "-a" && cmd[2] != "-t" && cmd[2] != "-o") {
-        std::cout << "chmod: " << RED << "invalid " << RESET << "mode: '" << cmd[2] << "'" << std::endl;
+        std::cout << "chmod: " << "invalid " << "mode: '" << cmd[2] << "'" << std::endl;
         return;
     }
     std::string access(3, '-');
@@ -552,7 +555,7 @@ void Shell::cmd_chmod() {
             tmp.erase(tmp.find('x'), 1);
         }
         if (!tmp.empty()) {
-            std::cout << "chmod: " << RED << "invalid " << RESET << "access: '" << cmd[3] << "'" << std::endl;
+            std::cout << "chmod: " << "invalid " << "access: '" << cmd[3] << "'" << std::endl;
             return;
         }
     }
@@ -665,6 +668,80 @@ void Shell::cmd_help() {
 
 void Shell::cmd_clear() {
     system("cls");
+}
+
+void Shell::cmd_echo() {
+    if (cmd.size() == 2) {
+        std::cout << cmd[1] << std::endl;
+    } else if (cmd.size() == 4) { // 形式: echo "content" > file 或 echo "content" >> file
+        if (cmd[2] != ">" && cmd[2] != ">>") { // 检查重定向运算符是否有效
+            std::cout << "echo: syntax error: unrecognized redirect operator '" << cmd[2] << "'" << std::endl;
+            return;
+        }
+        std::string content_to_write = cmd[1];
+        std::string target_file_path = cmd[3]; // 目标文件路径
+        bool append = (cmd[2] == ">>");       // 是否是追加模式
+        // 解析文件路径和文件名
+        std::vector<std::string> path_parts = split_path(target_file_path);
+        if (path_parts.empty()) { // 路径为空 (e.g., echo "a" > "") 或解析失败
+            std::cout << "echo: invalid file path '" << target_file_path << "'" << std::endl;
+            return;
+        }
+        std::string fileName = path_parts.back(); // 提取文件名
+        path_parts.pop_back();                     // path_parts 现在只包含父目录部分
+        if (fileName.length() >= FILE_NAME_LENGTH) { // 检查文件名长度
+            std::cout << "echo: too long file name '" << fileName << "'" << std::endl;
+            return;
+        }
+        // ---------- 处理文件内容（读取、组合）----------
+        if (append) { // 如果是追加模式 (>>)，需要先读取文件原有内容
+            // CommandLineInterface::cat 方法可以读取文件内容并返回
+            std::tuple<bool, std::string, std::string> existing_content_tuple; // tuple: {success, content, creationTime}
+            std::get<0>(existing_content_tuple) = false; // 标记：我们希望cat把内容写入这里
+            bool cat_success;
+            if (path_parts.empty()) { // 文件在当前目录
+                cat_success = userInterface.cat(user.uid, fileName, target_file_path, &existing_content_tuple);
+            } else { // 文件在指定路径
+                cat_success = userInterface.cat(user.uid, path_parts, fileName, target_file_path, &existing_content_tuple);
+            }
+            if (!cat_success) {
+                // 如果cat失败（例如文件不存在、权限不足、是目录等），cat会打印错误信息。
+                // 特别是 "No such file or directory" 错误，在追加模式下，我们不允许创建新文件。
+                std::cout << "echo: " << target_file_path << ": No such file or directory. Use '>' to create and write." << std::endl;
+                return;
+            }
+            content_to_write = std::get<1>(existing_content_tuple) + content_to_write; // 如果cat成功，将新内容追加到原有内容之后
+            // 为了保持文件创建时间，我们将cat读到的旧创建时间传递给vim
+            // vim的tuple第三个元素是创建时间
+            std::get<2>(existing_content_tuple); // 暂存旧创建时间，将在vim调用时使用
+        }
+        // ---------- 写入文件 ----------
+        std::tuple<bool, std::string, std::string> write_content_tuple;
+        std::get<0>(write_content_tuple) = false; // 标记：这是传入的内容
+        std::get<1>(write_content_tuple) = content_to_write;
+
+        // 如果是追加模式，使用读取到的原始文件的创建时间；否则，使用当前时间（vim会处理新文件）
+        if (append) {
+            std::get<2>(write_content_tuple) = INode::getCurTime(); // 传入当前时间，vim会根据情况决定是否使用
+        } else {
+            std::get<2>(write_content_tuple) = INode::getCurTime();
+        }
+
+        bool write_success;
+        if (path_parts.empty()) { // 文件在当前目录
+            write_success = userInterface.vim(user.uid, fileName, target_file_path, &write_content_tuple);
+        } else { // 文件在指定路径
+            write_success = userInterface.vim(user.uid, path_parts, fileName, target_file_path, &write_content_tuple);
+        }
+        if (!write_success) { // vim 内部会打印详细的错误信息（例如权限不足、路径不存在等），所以这里无需重复打印。
+            return;
+        }
+    } else { // 参数数量不正确
+        std::cout << "echo: invalid number of arguments." << std::endl;
+        std::cout << "Usage: echo <TEXT>           (print to terminal)" << std::endl;
+        std::cout << "       echo <TEXT> > <FILE>  (overwrite file)" << std::endl;
+        std::cout << "       echo <TEXT> >> <FILE> (append to file)" << std::endl;
+    }
 }
 
 void Shell::cmd_vim() {

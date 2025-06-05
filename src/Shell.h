@@ -10,7 +10,6 @@
 
 #include "CommandLineInterface.h"
 #include "entity/User.h"
-#include "Tools.h"
 
 class Shell {
 public:
@@ -23,37 +22,32 @@ public:
 
     //界面主程序
     void exec(); //退出终端的具体实现
-    void cmd_login(); //登录
-    void cmd_logout(); //logout命令处理程序
-    void cmd_exit(); //exit命令处理程序
-
-    void cmd_cd(); //cd命令处理程序
-    void cmd_ls(); //ls命令处理程序
-
-    void cmd_touch(); //touch命令处理程序
-    void cmd_cat(); //cat命令处理程序
-    void cmd_vim(); //vim命令处理程序
-
-    void cmd_mv(); //mv命令处理程序
-    void cmd_cp(); //cp命令处理程序
-    void cmd_rm(); //rm命令处理程序
-
-    void cmd_mkdir(); //mkdir命令处理程序
-    void cmd_rmdir(); //rmdir命令处理程序
-
+    void cmd_cat();
+    void cmd_cd();
+    void cmd_clear();
+    void cmd_chmod();
+    void cmd_cp();
+    void cmd_distrust();
+    void cmd_echo();
+    void cmd_exit();
+    void cmd_format();
+    void cmd_help();
+    void cmd_login();
+    void cmd_logout();
+    void cmd_ls();
+    void cmd_lsuser();
+    void cmd_mkdir();
+    void cmd_mkuser();
+    void cmd_mv();
+    void cmd_passwd();
+    void cmd_rm();
+    void cmd_rmdir();
+    void cmd_rmuser();
     bool cmd_sudo();
-    void cmd_format(); //format命令处理程序
-    void cmd_chmod(); //chmod命令处理程序
+    void cmd_touch();
+    void cmd_trust();
 
-    void cmd_mkuser(); //mkuser命令处理程序
-    void cmd_rmuser(); //rmuser命令处理程序
-    void cmd_lsuser(); //lsuser命令处理程序
-    void cmd_passwd(); //passwd命令处理程序
-    void cmd_trust(); //trust命令处理程序
-    void cmd_distrust(); //distrust命令处理程序
-
-    void cmd_help(); //help命令处理程序
-    void cmd_clear(); //clear命令处理程序
+    void cmd_vim(); //vim命令处理程序
 
     void outputPrefix(); //输出当前文件系统的命令提示符
 

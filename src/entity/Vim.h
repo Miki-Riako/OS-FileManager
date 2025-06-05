@@ -11,7 +11,6 @@
 // #include <bits/stdc++.h>
 #include <conio.h>
 #include <windows.h>
-#include "../Tools.h"
 
 using std::cout, std::endl, std::string, std::vector, std::pair;
 

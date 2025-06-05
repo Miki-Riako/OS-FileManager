@@ -320,7 +320,7 @@ void Vim::advanced_cmd_mode(int ch) {
         if (readonly) {
             if (cmd == "w" || cmd == "wq") {
                 error = true;
-                errortp = string(RED) + "It's a read only document   " + string(RESET);
+                errortp = "It's a read only document   ";
             }
             else if (cmd == "q") //quit if not edited
             {
@@ -330,7 +330,7 @@ void Vim::advanced_cmd_mode(int ch) {
                 }
                 else {
                     error = true;
-                    errortp = string(RED) + "You have already editted this document   " + string(RESET);
+                    errortp = "You have already editted this document   ";
                 }
             }
             else if (cmd == "q!") {
@@ -339,7 +339,7 @@ void Vim::advanced_cmd_mode(int ch) {
 
             else {
                 error = true;
-                errortp = string(RED) + "No such command                         " + string(RESET);
+                errortp = "No such command                         ";
             }
         }
         else {
@@ -372,12 +372,12 @@ void Vim::advanced_cmd_mode(int ch) {
                 }
                 else {
                     error = true;
-                    errortp = string(RED) + "You have already editted this document   " + string(RESET);
+                    errortp = "You have already editted this document   ";
                 }
             }
             else {
                 error = true;
-                errortp = string(RED) + "No such command                         " + string(RESET);
+                errortp = "No such command                         ";
             }
         }
 
