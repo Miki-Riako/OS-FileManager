@@ -672,34 +672,39 @@ void Shell::cmd_clear() {
 
 void Shell::cmd_echo() {
     if (cmd.size() == 2) {
-        std::cout << cmd[1] << std::endl;
+        std::cout << cmd[1] << std::endl; // 打印到终端，std::endl会添加换行
     } else if (cmd.size() == 4) { // 形式: echo "content" > file 或 echo "content" >> file
         if (cmd[2] != ">" && cmd[2] != ">>") { // 检查重定向运算符是否有效
             std::cout << "echo: syntax error: unrecognized redirect operator '" << cmd[2] << "'" << std::endl;
             return;
         }
-        std::string content_to_write = cmd[1];
+        std::string content_to_process = cmd[1]; // 用户输入的待写入内容
         std::string target_file_path = cmd[3]; // 目标文件路径
         bool append = (cmd[2] == ">>");       // 是否是追加模式
         // 解析文件路径和文件名
         std::vector<std::string> path_parts = split_path(target_file_path);
-        if (path_parts.empty()) { // 路径为空 (e.g., echo "a" > "") 或解析失败
+        // 修正路径解析，确保即使是根目录或当前目录的空路径也有效
+        if (path_parts.empty() || (path_parts.size() == 1 && path_parts[0].empty() && target_file_path != "~")) {
             std::cout << "echo: invalid file path '" << target_file_path << "'" << std::endl;
             return;
         }
         std::string fileName = path_parts.back(); // 提取文件名
-        path_parts.pop_back();                     // path_parts 现在只包含父目录部分
+        if (path_parts.size() > 1 || (path_parts.size() == 1 && !path_parts[0].empty())) { // 只有在path_parts不是空的或者不是只包含一个空字符串（即根目录或当前目录）时才pop_back
+            path_parts.pop_back();                     // path_parts 现在只包含父目录部分
+        } else { // Handle root/current directory file directly when path_parts is initially just {""} or {"~"}
+            path_parts.clear(); // Ensure it's truly empty if it represents current dir for clarity
+        }
         if (fileName.length() >= FILE_NAME_LENGTH) { // 检查文件名长度
             std::cout << "echo: too long file name '" << fileName << "'" << std::endl;
             return;
         }
-        // ---------- 处理文件内容（读取、组合）----------
-        if (append) { // 如果是追加模式 (>>)，需要先读取文件原有内容
-            // CommandLineInterface::cat 方法可以读取文件内容并返回
+        std::string final_content_for_vim;
+        std::string original_creation_time;
+        if (append) { // 如果是追加模式 (>>)
             std::tuple<bool, std::string, std::string> existing_content_tuple; // tuple: {success, content, creationTime}
-            std::get<0>(existing_content_tuple) = false; // 标记：我们希望cat把内容写入这里
+            std::get<0>(existing_content_tuple) = false; // Flag to indicate we want content back
             bool cat_success;
-            if (path_parts.empty()) { // 文件在当前目录
+            if (path_parts.empty()) { // 文件在当前目录或根目录
                 cat_success = userInterface.cat(user.uid, fileName, target_file_path, &existing_content_tuple);
             } else { // 文件在指定路径
                 cat_success = userInterface.cat(user.uid, path_parts, fileName, target_file_path, &existing_content_tuple);
@@ -707,28 +712,29 @@ void Shell::cmd_echo() {
             if (!cat_success) {
                 // 如果cat失败（例如文件不存在、权限不足、是目录等），cat会打印错误信息。
                 // 特别是 "No such file or directory" 错误，在追加模式下，我们不允许创建新文件。
-                std::cout << "echo: " << target_file_path << ": No such file or directory. Use '>' to create and write." << std::endl;
+                std::cout << "echo: " << target_file_path << ": No such file or directory for append. Use '>' to create and write." << std::endl;
                 return;
             }
-            content_to_write = std::get<1>(existing_content_tuple) + content_to_write; // 如果cat成功，将新内容追加到原有内容之后
-            // 为了保持文件创建时间，我们将cat读到的旧创建时间传递给vim
-            // vim的tuple第三个元素是创建时间
-            std::get<2>(existing_content_tuple); // 暂存旧创建时间，将在vim调用时使用
+            std::string existing_content = std::get<1>(existing_content_tuple);
+            original_creation_time = std::get<2>(existing_content_tuple); // 保留原有文件的创建时间
+            // 确保现有内容以换行符结尾，除非它是空文件。
+            if (!existing_content.empty() && existing_content.back() != '\n') {
+                existing_content += '\n';
+            }
+            // 将新内容追加到原有内容之后，并确保新内容也以换行符结尾。
+            final_content_for_vim = existing_content + content_to_process + "\n";
+        } else { // 如果是覆盖模式 (>)
+            // 写入的内容就是用户输入的，并确保以换行符结尾。
+            final_content_for_vim = content_to_process + "\n";
+            original_creation_time = INode::getCurTime(); // 新文件或覆盖文件，创建时间设置为当前
         }
         // ---------- 写入文件 ----------
         std::tuple<bool, std::string, std::string> write_content_tuple;
         std::get<0>(write_content_tuple) = false; // 标记：这是传入的内容
-        std::get<1>(write_content_tuple) = content_to_write;
-
-        // 如果是追加模式，使用读取到的原始文件的创建时间；否则，使用当前时间（vim会处理新文件）
-        if (append) {
-            std::get<2>(write_content_tuple) = INode::getCurTime(); // 传入当前时间，vim会根据情况决定是否使用
-        } else {
-            std::get<2>(write_content_tuple) = INode::getCurTime();
-        }
-
+        std::get<1>(write_content_tuple) = final_content_for_vim;
+        std::get<2>(write_content_tuple) = original_creation_time; // 传递文件创建时间
         bool write_success;
-        if (path_parts.empty()) { // 文件在当前目录
+        if (path_parts.empty()) { // 文件在当前目录或根目录
             write_success = userInterface.vim(user.uid, fileName, target_file_path, &write_content_tuple);
         } else { // 文件在指定路径
             write_success = userInterface.vim(user.uid, path_parts, fileName, target_file_path, &write_content_tuple);

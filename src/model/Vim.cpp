@@ -97,9 +97,16 @@ void Vim::changePos(int p) {
 
 string Vim::merge_string() {
     string ans = "";
-    for (auto& x : vs) {
-        ans += x;
-        ans += '\n';
+    if (vs.empty()) {
+        return ""; // 如果没有行，返回空字符串
+    }
+    for (size_t i = 0; i < vs.size(); ++i) { // 遍历所有行，除了最后一行，都在后面添加换行符
+        ans += vs[i];
+        if (i < vs.size() - 1) { // 如果不是最后一行，则添加换行符
+            ans += '\n';
+        } else if (!vs[i].empty()) { // 如果是最后一行，且该行内容不为空，则添加一个末尾换行符
+            ans += '\n';
+        }
     }
     return ans;
 }
