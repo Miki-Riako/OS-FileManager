@@ -2,7 +2,7 @@ import json
 
 from pathlib import Path
 
-from PySide6.QtCore import QSize, QEventLoop, QTimer, Qt
+from PySide6.QtCore import QSize, QEventLoop, QTimer, Qt, Signal
 from PySide6.QtGui import QIcon, QFont, QColor, QShortcut, QKeySequence
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
 
@@ -13,6 +13,8 @@ from qfluentwidgets import (
 from qfluentwidgets import FluentIcon as FIF
 
 class Editor(QFrame):
+    saveFileRequested = Signal(str, str)
+
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         self.setupUi()
@@ -43,9 +45,22 @@ class Editor(QFrame):
         self.setLayout(self.layout)
 
     def save(self):
-        InfoBar.success(
-            title='Save',
-            content="You pressed Ctrl+S. Waiting for save to be implemented...",
+        if not self.current_file_path:
+            InfoBar.warning(
+                title='保存失败',
+                content="请先加载文件才能保存。",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
+            return
+        file_content = self.editor_space.toPlainText()
+        self.saveFileRequested.emit(self.current_file_path, file_content) # 发出信号，请求 Terminal 执行保存操作
+        InfoBar.info( # 立即显示正在保存的提示
+            title='保存中',
+            content=f"正在保存 '{Path(self.current_file_path).name}'...",
             orient=Qt.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -66,3 +81,25 @@ class Editor(QFrame):
             duration=2000,
             parent=self
         )
+
+    def _handle_save_complete(self, file_path: str, success: bool, error_message: str):
+        if success:
+            InfoBar.success(
+                title='保存成功',
+                content=f"文件 '{Path(file_path).name}' 已成功保存。",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
+        else:
+            InfoBar.error(
+                title='保存失败',
+                content=f"文件 '{Path(file_path).name}' 保存失败: {error_message}",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self
+            )

@@ -33,6 +33,7 @@ class Terminal(QWidget):
     explorerCommandOutputReady = Signal(str, str, bool, str, str) # 用于 Explorer
     requestExplorerRefresh = Signal()
     editorContentReady = Signal(str, str, bool, str)
+    editorSaveComplete = Signal(str, bool, str)
 
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
@@ -134,11 +135,9 @@ class Terminal(QWidget):
                 new_mode = TerminalInputMode.INITIALIZING
             else: # 否则，默认为正常模式，等待用户输入
                 new_mode = TerminalInputMode.NORMAL
-
-
         return new_mode, new_input_start_index
 
-    def _handle_api_output(self, terminal_object_name: str, output: str, is_error: bool = False):
+    def _process_special_command_output_output(self, terminal_object_name: str, output: str, is_error: bool = False):
         """处理来自 API 的标准输出信号。"""
         text_edit = self._get_terminal_widget_by_object_name(terminal_object_name)
         if not text_edit:
@@ -151,10 +150,10 @@ class Terminal(QWidget):
             = self._determine_terminal_state(full_text)
 
         if terminal_object_name == self._explorer_current_api_obj_name and self._explorer_command_sent_at_index != -1:
-            self._handle_api(terminal_object_name, output, is_error, full_text)
+            self._process_special_command_output(terminal_object_name, output, is_error, full_text)
 
-    def _handle_api(self, terminal_obj_name: str, output: str, is_error, full_text: str):
-        """处理来自 API 的标准输出信号，专门用于 Explorer 和 Editor。"""
+    def _process_special_command_output(self, terminal_obj_name: str, output: str, is_error, full_text: str):
+        """处理来自 API 的标准输出信号，专门用于 Explorer 和 Editor 的后台命令。"""
         if terminal_obj_name not in self._explorer_pending_requests:
             return
 
@@ -171,78 +170,113 @@ class Terminal(QWidget):
                 if full_buffered_output.strip().endswith(last_prompt_match.group(0).strip()):
                     command_is_complete = True
 
-        if command_is_complete:
-            issued_command_type = request_info.get("command_type", "unknown")
-            file_path_for_editor = request_info.get("file_path", "")
-            output_to_process = "" # Initialize here
+        if is_error and command_is_complete: # 如果收到了错误输出且命令似乎已完成
+            self._handle_special_command_completion(terminal_obj_name, full_buffered_output, True) # 标记为失败并完成
+            return
 
-            if issued_command_type == "cat_file_content":
-                prompt_text = last_prompt_match.group(0) # 获取完整的提示符字符串 (e.g., "OSFileSystem@root:~$ ")
-                prompt_start_index = full_buffered_output.rfind(prompt_text)
-                if prompt_start_index != -1:
-                    output_to_process = full_buffered_output[:prompt_start_index].strip()
-                else: # 这种情况理论上不应该发生，因为 command_is_complete 已经判断了提示符存在。
-                    output_to_process = full_buffered_output.strip()
-            elif issued_command_type.startswith("cd"):
-                output_to_process = full_buffered_output
-            elif issued_command_type.startswith("ls"):
-                output_to_process = full_buffered_output
-            else: # For "other" or unknown commands
-                output_to_process = full_buffered_output
-            # Reset Explorer state (important!)
-            self._explorer_command_sent_at_index = -1
-            self._explorer_current_api_obj_name = None
-            request_info["output_buffer"].clear() # Clear buffer
-            # Emit the appropriate signal based on command type
+        if command_is_complete:
+            self._handle_special_command_completion(terminal_obj_name, full_buffered_output, False)
+
+    def _handle_special_command_completion(self, terminal_obj_name: str, full_buffered_output: str, force_error: bool = False):
+        """
+        处理特殊命令（Explorer 或 Editor）完成后的逻辑。
+        force_error: 标记为真表示即使没有明显的错误提示符，也应将此操作视为失败。
+        """
+        request_info = self._explorer_pending_requests.get(terminal_obj_name)
+        if not request_info:
+            return
+
+        issued_command_type = request_info.get("command_type", "unknown")
+        file_path_for_editor = request_info.get("file_path", "")
+        command_queue = request_info.get("command_queue", [])
+        
+        # 查找最后一个提示符以截断输出
+        prompt_match = self.main_shell_prompt_regex.search(full_buffered_output)
+        output_to_process = full_buffered_output
+        if prompt_match:
+            prompt_text = prompt_match.group(0)
+            prompt_start_index = full_buffered_output.rfind(prompt_text)
+            if prompt_start_index != -1:
+                output_to_process = full_buffered_output[:prompt_start_index].strip()
+            
+        request_info["output_buffer"].clear() # 清空缓冲区
+
+        if issued_command_type == "save_file_content":
+            # 如果是保存命令，检查命令队列
+            if command_queue: # 还有命令在队列中
+                next_command = command_queue.pop(0) # 取出下一条命令
+                api = self.terminal_apis.get(terminal_obj_name)
+                if api:
+                    # 避免在错误状态下继续发送命令
+                    if force_error:
+                        self._reset_special_command_state(terminal_obj_name)
+                        self.editorSaveComplete.emit(file_path_for_editor, False, "保存操作中途发生错误。")
+                        return
+
+                    self._append_to_terminal(self._get_terminal_widget_by_object_name(terminal_obj_name), next_command + '\n')
+                    api.send_input_to_app(next_command)
+                else:
+                    self._reset_special_command_state(terminal_obj_name)
+                    self.editorSaveComplete.emit(file_path_for_editor, False, "API实例丢失，无法继续保存操作。")
+            else: # 命令队列为空，所有保存命令已发送完毕
+                self._reset_special_command_state(terminal_obj_name)
+                self.editorSaveComplete.emit(file_path_for_editor, not force_error, "" if not force_error else "保存操作失败。")
+        else: # 处理 Explorer 命令完成
+            self._reset_special_command_state(terminal_obj_name) # Reset Explorer state (important!)
             if issued_command_type == "cat_file_content":
                 self.editorContentReady.emit(
                     file_path_for_editor,
-                    output_to_process, # 传递提取到的内容
-                    not is_error,
-                    "" if not is_error else "Failed to retrieve file content."
+                    output_to_process,
+                    not force_error,
+                    "" if not force_error else "Failed to retrieve file content."
                 )
             elif issued_command_type.startswith("cd"):
                 self.explorerCommandOutputReady.emit(
                     terminal_obj_name,
                     output_to_process,
-                    not is_error,
-                    "" if not is_error else "CD command failed.",
+                    not force_error,
+                    "" if not force_error else "CD command failed.",
                     issued_command_type
                 )
-                if not is_error:
+                if not force_error:
                     self.requestExplorerRefresh.emit()
             elif issued_command_type.startswith("ls"):
                 self.explorerCommandOutputReady.emit(
                     terminal_obj_name,
                     output_to_process,
-                    not is_error,
-                    "" if not is_error else "LS command failed.",
+                    not force_error,
+                    "" if not force_error else "LS command failed.",
                     issued_command_type
                 )
             else: # For "other" or unknown commands
                 self.explorerCommandOutputReady.emit(
                     terminal_obj_name,
                     output_to_process,
-                    not is_error,
+                    not force_error,
                     "",
                     issued_command_type
                 )
 
-    def _send_explorer_error(self, terminal_object_name, error_message, original_command: str = ""):
-        command_lower = original_command.lower().strip() # 根据原始命令判断类型
-        cmd_type = "cd" if command_lower.startswith("cd") else "ls" if command_lower.startswith("ls") else "unknown"
-
-        self.explorerCommandOutputReady.emit(
-            terminal_object_name,
-            "", # 无输出
-            False, # 失败
-            error_message,
-            cmd_type # 传递判断后的命令类型
-        )
+    def _reset_special_command_state(self, terminal_object_name: str):
+        """重置特殊命令处理状态。"""
         self._explorer_command_sent_at_index = -1
         self._explorer_current_api_obj_name = None
+        self._explorer_pending_requests.pop(terminal_object_name, None)
 
-    def _handle_api_finished(self, terminal_object_name: str, exitCode: int, exitStatus: QProcess.ExitStatus):
+    def _send_special_command_error(self, terminal_object_name: str, error_message: str, original_command_type: str, file_path: str = ""):
+        if original_command_type == "cat_file_content" or original_command_type == "save_file_content":
+            self.editorContentReady.emit(file_path, "", False, error_message) if original_command_type == "cat_file_content" else self.editorSaveComplete.emit(file_path, False, error_message)
+        else: # Explorer commands
+            self.explorerCommandOutputReady.emit(
+                terminal_object_name,
+                "", # 无输出
+                False, # 失败
+                error_message,
+                original_command_type
+            )
+        self._reset_special_command_state(terminal_object_name)
+
+    def _process_special_command_output_finished(self, terminal_object_name: str, exitCode: int, exitStatus: QProcess.ExitStatus):
         """处理来自 API 的进程结束信号。"""
         text_edit = self._get_terminal_widget_by_object_name(terminal_object_name)
         if text_edit:
@@ -254,9 +288,9 @@ class Terminal(QWidget):
                 if not terminal_api.start_app_process(): # 重新启动应用程序
                     self._append_to_terminal(text_edit, "重新启动 Shell 失败。\n", is_error=True)
                     if terminal_object_name == self._explorer_current_api_obj_name:
-                        self._send_explorer_error(terminal_object_name, f"Shell process crashed or failed to restart: {status_str}")
+                        self._send_special_command_error(terminal_object_name, f"Shell process crashed or failed to restart: {status_str}")
 
-    def _handle_api_error_occurred(self, terminal_object_name: str, error_message: str):
+    def _process_special_command_output_error_occurred(self, terminal_object_name: str, error_message: str):
         """处理来自 API 的 QProcess 错误信号。"""
         text_edit = self._get_terminal_widget_by_object_name(terminal_object_name)
         if text_edit:
@@ -267,7 +301,7 @@ class Terminal(QWidget):
             text_edit.setTextCursor(cursor)
             text_edit.ensureCursorVisible()
             if terminal_object_name == self._explorer_current_api_obj_name:
-                self._send_explorer_error(terminal_object_name, f"API process error: {error_message}")
+                self._send_special_command_error(terminal_object_name, f"API process error: {error_message}")
 
     def _send_command_to_current_terminal(self, text_edit: PlainTextEdit):
         """从 PlainTextEdit 中获取用户输入的命令，并通过 API 发送给对应的 Shell。"""
@@ -350,7 +384,7 @@ class Terminal(QWidget):
             return False
         current_terminal_mode = self.get_terminal_mode(terminal_obj_name)
         if current_terminal_mode != TerminalInputMode.NORMAL:
-            self._send_explorer_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。", command)
+            self._send_special_command_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。", command)
             return False
         self._explorer_current_api_obj_name = terminal_obj_name
         self._explorer_command_sent_at_index = len(text_edit.document().toPlainText()) # 记录当前文本长度。
@@ -455,10 +489,10 @@ class Terminal(QWidget):
         # self.tabBar.setCurrentTab(objectName) # 有bug暂时别用
         terminal_api = API(objectName, "app", self)
         self.terminal_apis[objectName] = terminal_api # 存储起来
-        terminal_api.standardOutputReady.connect(self._handle_api_output)
-        terminal_api.standardErrorReady.connect(lambda obj_name, error_output: self._handle_api_output(obj_name, error_output, True))
-        terminal_api.processFinished.connect(self._handle_api_finished)
-        terminal_api.processErrorOccurred.connect(self._handle_api_error_occurred)
+        terminal_api.standardOutputReady.connect(self._process_special_command_output_output)
+        terminal_api.standardErrorReady.connect(lambda obj_name, error_output: self._process_special_command_output_output(obj_name, error_output, True))
+        terminal_api.processFinished.connect(self._process_special_command_output_finished)
+        terminal_api.processErrorOccurred.connect(self._process_special_command_output_error_occurred)
         if not terminal_api.start_app_process():
             self.warning("启动失败", f"无法启动终端进程 {objectName}。")
 
@@ -549,32 +583,24 @@ class Terminal(QWidget):
         )
 
     def request_file_content_for_editor(self, file_path: str) -> bool:
-        """
-        Requests file content for the editor.
-        The output will be emitted via editorContentReady signal.
-        """
         api = self.get_current_api()
         if not api:
-            self.warning("警告", "没有激活的终端API实例可供编辑器使用。")
-            self.editorContentReady.emit(file_path, "", False, "No active terminal API for Editor.")
+            self._send_special_command_error("", "没有激活的终端API实例可供编辑器使用。", "cat_file_content", file_path)
             return False
 
         terminal_obj_name = api.terminal_object_name
         text_edit = self._get_terminal_widget_by_object_name(terminal_obj_name)
         if not text_edit:
-            self.warning("警告", f"未找到终端UI组件 '{terminal_obj_name}'。")
-            self.editorContentReady.emit(file_path, "", False, f"No UI widget for '{terminal_obj_name}'.")
+            self._send_special_command_error(terminal_obj_name, f"未找到终端UI组件 '{terminal_obj_name}'。", "cat_file_content", file_path)
             return False
 
         if self._explorer_current_api_obj_name is not None:
-            self.warning("警告", "已有命令正在进行中，请稍后。")
-            self.editorContentReady.emit(file_path, "", False, "Another command is already in progress.")
+            self._send_special_command_error(terminal_obj_name, "已有命令正在进行中，请稍后。", "cat_file_content", file_path)
             return False
 
         current_terminal_mode = self.get_terminal_mode(terminal_obj_name)
         if current_terminal_mode != TerminalInputMode.NORMAL:
-            self.warning("警告", "终端未就绪（请先登录）。")
-            self.editorContentReady.emit(file_path, "", False, f"Terminal not ready (current mode: {current_terminal_mode}). Please log in.")
+            self._send_special_command_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。", "cat_file_content", file_path)
             return False
 
         self._explorer_current_api_obj_name = terminal_obj_name
@@ -584,10 +610,74 @@ class Terminal(QWidget):
         self._explorer_pending_requests[terminal_obj_name] = {
             "output_buffer": [],
             "command_type": "cat_file_content",
-            "file_path": file_path # Store the file path for the signal
+            "file_path": file_path, # Store the file path for the signal
+            "command_queue": [] # For cat, no queue needed, just one command
         }
 
-        command_to_send = f"cat {file_path}"
+        command_to_send = f"cat \"{file_path}\"" # 确保文件路径包含空格时也能正确处理
         self._append_to_terminal(text_edit, command_to_send + '\n') # Show the command in the terminal
         api.send_input_to_app(command_to_send)
         return True
+
+    def save_file_content_from_editor(self, file_path: str, content: str) -> bool:
+        """
+        Saves file content from the editor by sending multiple echo commands.
+        The result will be emitted via editorSaveComplete signal.
+        """
+        api = self.get_current_api()
+        if not api:
+            self._send_special_command_error("", "没有激活的终端API实例可供编辑器使用。", "save_file_content", file_path)
+            return False
+
+        terminal_obj_name = api.terminal_object_name
+        text_edit = self._get_terminal_widget_by_object_name(terminal_obj_name)
+        if not text_edit:
+            self._send_special_command_error(terminal_obj_name, f"未找到终端UI组件 '{terminal_obj_name}'。", "save_file_content", file_path)
+            return False
+
+        if self._explorer_current_api_obj_name is not None:
+            self._send_special_command_error(terminal_obj_name, "已有命令正在进行中，请稍后。", "save_file_content", file_path)
+            return False
+
+        current_terminal_mode = self.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self._send_special_command_error(terminal_obj_name, f"终端未就绪（当前模式：{current_terminal_mode}）。请先在 '终端管理器' 标签页登录。", "save_file_content", file_path)
+            return False
+
+        lines = content.splitlines()
+        commands = []
+        if lines:
+            # 第一行使用 > 覆盖
+            # 先对内容进行转义，得到一个不包含反斜杠的字符串变量，再插入到 f-string
+            escaped_first_line_content = lines[0].replace('"', '\\"')
+            commands.append(f'echo "{escaped_first_line_content}" > "{file_path}"') # <<<<<< 修改这一行
+
+            # 后续行使用 >> 追加
+            for line in lines[1:]:
+                escaped_line_content = line.replace('"', '\\"')
+                commands.append(f'echo "{escaped_line_content}" >> "{file_path}"') # <<<<<< 修改这一行
+        else:
+            # 如果内容为空，则清空文件
+            commands.append(f'echo "" > "{file_path}"') # <<<<<< 保持不变，或者改为 f'echo "" > "{file_path}"' 也行
+
+
+
+        self._explorer_current_api_obj_name = terminal_obj_name
+        self._explorer_command_sent_at_index = len(text_edit.document().toPlainText())
+
+        self._explorer_pending_requests[terminal_obj_name] = {
+            "output_buffer": [],
+            "command_type": "save_file_content",
+            "file_path": file_path,
+            "command_queue": commands # Store all commands to be executed sequentially
+        }
+
+        # Send the first command immediately
+        if commands:
+            first_command = commands.pop(0)
+            self._append_to_terminal(text_edit, first_command + '\n')
+            api.send_input_to_app(first_command)
+            return True
+        else: # Should not happen if lines processing is correct
+            self._send_special_command_error(terminal_obj_name, "没有生成保存命令。", "save_file_content", file_path)
+            return False
