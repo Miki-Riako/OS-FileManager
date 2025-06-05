@@ -18,6 +18,7 @@ class Editor(QFrame):
         self.setupUi()
         self.editor_space = PlainTextEdit(self)
         self.saveShortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        self.current_file_path = None
         self.__initWidget()
         self.setObjectName(text.replace(' ', '-'))
 
@@ -45,6 +46,20 @@ class Editor(QFrame):
         InfoBar.success(
             title='Save',
             content="You pressed Ctrl+S. Waiting for save to be implemented...",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self
+        )
+
+    def load_content(self, file_path: str, content: str):
+        self.current_file_path = file_path
+        self.editor_space.setPlainText(content)
+        self.editor_space.setPlaceholderText(f"Editing: {file_path}")
+        InfoBar.success(
+            title='File Loaded',
+            content=f"Successfully loaded '{Path(file_path).name}'",
             orient=Qt.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,

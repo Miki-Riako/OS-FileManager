@@ -32,6 +32,7 @@ class TerminalInputMode:
 class Terminal(QWidget):
     explorerCommandOutputReady = Signal(str, str, bool, str, str) # 用于 Explorer
     requestExplorerRefresh = Signal()
+    editorContentReady = Signal(str, str, bool, str)
 
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
@@ -150,39 +151,82 @@ class Terminal(QWidget):
             = self._determine_terminal_state(full_text)
 
         if terminal_object_name == self._explorer_current_api_obj_name and self._explorer_command_sent_at_index != -1:
-            self._handle_api_for_explorer(terminal_object_name, output, is_error, full_text)
+            self._handle_api(terminal_object_name, output, is_error, full_text)
 
-    def _handle_api_for_explorer(self, terminal_object_name: str, output: str, is_error, full_text: str):
-        """处理来自 API 的标准输出信号，专门用于 Explorer。"""
-        if terminal_object_name not in self._explorer_pending_requests:
+    def _handle_api(self, terminal_obj_name: str, output: str, is_error, full_text: str):
+        """处理来自 API 的标准输出信号，专门用于 Explorer 和 Editor。"""
+        if terminal_obj_name not in self._explorer_pending_requests:
             return
-        request_info = self._explorer_pending_requests[terminal_object_name]
+
+        request_info = self._explorer_pending_requests[terminal_obj_name]
         request_info["output_buffer"].append(output) # 累积所有输出
         full_buffered_output = "".join(request_info["output_buffer"])
-        current_mode = self.terminal_modes.get(terminal_object_name)
+        current_mode = self.terminal_modes.get(terminal_obj_name)
+
         command_is_complete = False
-        if current_mode == TerminalInputMode.NORMAL: # 只有当处于 NORMAL 模式时才检查完成
+        if current_mode == TerminalInputMode.NORMAL:
             prompt_matches = list(self.main_shell_prompt_regex.finditer(full_buffered_output))
             if prompt_matches:
-                last_prompt_match = prompt_matches[-1]
+                last_prompt_match = prompt_matches[-1] # 确保最后一个提示符在缓冲输出的末尾附近，才认为是命令完成
                 if full_buffered_output.strip().endswith(last_prompt_match.group(0).strip()):
                     command_is_complete = True
+
         if command_is_complete:
+            issued_command_type = request_info.get("command_type", "unknown")
+            file_path_for_editor = request_info.get("file_path", "")
+            output_to_process = "" # Initialize here
+
+            if issued_command_type == "cat_file_content":
+                prompt_text = last_prompt_match.group(0) # 获取完整的提示符字符串 (e.g., "OSFileSystem@root:~$ ")
+                prompt_start_index = full_buffered_output.rfind(prompt_text)
+                if prompt_start_index != -1:
+                    output_to_process = full_buffered_output[:prompt_start_index].strip()
+                else: # 这种情况理论上不应该发生，因为 command_is_complete 已经判断了提示符存在。
+                    output_to_process = full_buffered_output.strip()
+            elif issued_command_type.startswith("cd"):
+                output_to_process = full_buffered_output
+            elif issued_command_type.startswith("ls"):
+                output_to_process = full_buffered_output
+            else: # For "other" or unknown commands
+                output_to_process = full_buffered_output
+            # Reset Explorer state (important!)
             self._explorer_command_sent_at_index = -1
             self._explorer_current_api_obj_name = None
-            issued_command_type = request_info.get("command_type", "unknown") # 获取存储的命令类型
-            request_info["output_buffer"].clear() # 清空缓冲
-            self.explorerCommandOutputReady.emit(
-                terminal_object_name,
-                full_buffered_output, # 发送所有收集到的输出
-                not is_error, # 假设成功，如果不是来自错误流
-                "", # 无特定错误信息
-                issued_command_type # 传递刚刚完成的命令类型
-            )
-            if issued_command_type == "cd" and not is_error:
-                self.requestExplorerRefresh.emit()
-            elif issued_command_type == "cd" and is_error:
-                self.warning("目录切换失败", f"无法切换到目标目录，请检查路径。")
+            request_info["output_buffer"].clear() # Clear buffer
+            # Emit the appropriate signal based on command type
+            if issued_command_type == "cat_file_content":
+                self.editorContentReady.emit(
+                    file_path_for_editor,
+                    output_to_process, # 传递提取到的内容
+                    not is_error,
+                    "" if not is_error else "Failed to retrieve file content."
+                )
+            elif issued_command_type.startswith("cd"):
+                self.explorerCommandOutputReady.emit(
+                    terminal_obj_name,
+                    output_to_process,
+                    not is_error,
+                    "" if not is_error else "CD command failed.",
+                    issued_command_type
+                )
+                if not is_error:
+                    self.requestExplorerRefresh.emit()
+            elif issued_command_type.startswith("ls"):
+                self.explorerCommandOutputReady.emit(
+                    terminal_obj_name,
+                    output_to_process,
+                    not is_error,
+                    "" if not is_error else "LS command failed.",
+                    issued_command_type
+                )
+            else: # For "other" or unknown commands
+                self.explorerCommandOutputReady.emit(
+                    terminal_obj_name,
+                    output_to_process,
+                    not is_error,
+                    "",
+                    issued_command_type
+                )
 
     def _send_explorer_error(self, terminal_object_name, error_message, original_command: str = ""):
         command_lower = original_command.lower().strip() # 根据原始命令判断类型
@@ -503,3 +547,47 @@ class Terminal(QWidget):
             duration=2000,
             parent=self
         )
+
+    def request_file_content_for_editor(self, file_path: str) -> bool:
+        """
+        Requests file content for the editor.
+        The output will be emitted via editorContentReady signal.
+        """
+        api = self.get_current_api()
+        if not api:
+            self.warning("警告", "没有激活的终端API实例可供编辑器使用。")
+            self.editorContentReady.emit(file_path, "", False, "No active terminal API for Editor.")
+            return False
+
+        terminal_obj_name = api.terminal_object_name
+        text_edit = self._get_terminal_widget_by_object_name(terminal_obj_name)
+        if not text_edit:
+            self.warning("警告", f"未找到终端UI组件 '{terminal_obj_name}'。")
+            self.editorContentReady.emit(file_path, "", False, f"No UI widget for '{terminal_obj_name}'.")
+            return False
+
+        if self._explorer_current_api_obj_name is not None:
+            self.warning("警告", "已有命令正在进行中，请稍后。")
+            self.editorContentReady.emit(file_path, "", False, "Another command is already in progress.")
+            return False
+
+        current_terminal_mode = self.get_terminal_mode(terminal_obj_name)
+        if current_terminal_mode != TerminalInputMode.NORMAL:
+            self.warning("警告", "终端未就绪（请先登录）。")
+            self.editorContentReady.emit(file_path, "", False, f"Terminal not ready (current mode: {current_terminal_mode}). Please log in.")
+            return False
+
+        self._explorer_current_api_obj_name = terminal_obj_name
+        self._explorer_command_sent_at_index = len(text_edit.document().toPlainText()) # Record current text length.
+
+        # Store file path and command type
+        self._explorer_pending_requests[terminal_obj_name] = {
+            "output_buffer": [],
+            "command_type": "cat_file_content",
+            "file_path": file_path # Store the file path for the signal
+        }
+
+        command_to_send = f"cat {file_path}"
+        self._append_to_terminal(text_edit, command_to_send + '\n') # Show the command in the terminal
+        api.send_input_to_app(command_to_send)
+        return True

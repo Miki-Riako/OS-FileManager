@@ -37,9 +37,11 @@ class GUI(FluentWindow):
         self.homeInterface     = Home("Home Interface", self)
         self.terminalInterface = Terminal('Terminal Interface', self)
         self.explorerInterface = Explorer('Explorer Interface', self.terminalInterface, self)
-        self.editor   = Editor('Editor Interface', self)
+        self.editor            = Editor('Editor Interface', self)
         self.aboutInterface    = About('About Interface', self)
         self.settingInterface  = Setting('Setting Interface', self)
+
+        self.terminalInterface.editorContentReady.connect(self._handle_editor_content_ready)
 
         self.initNavigation()
         self.splashScreen.finish()
@@ -68,3 +70,9 @@ class GUI(FluentWindow):
     def setupUI(self):
         self.setMinimumWidth(800)
         self.setMinimumHeight(600)
+
+    def _handle_editor_content_ready(self, file_path: str, content: str, success: bool, error_message: str):
+        if success:
+            self.editor.load_content(file_path, content)
+        else:
+            self.terminalInterface.warning(f"加载文件失败", error_message)

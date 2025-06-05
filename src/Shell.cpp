@@ -351,6 +351,9 @@ void Shell::cmd_cat() {
         return;
     }
 
+    if (!cmd[1].empty() && cmd[1][0] == '~') {
+        cmd[1] = cmd[1].substr(1);
+    }
     std::vector<std::string> src = split_path(cmd[1]);
     if (src.empty()) {
         std::cout << "cat: missing file operand" << std::endl;
