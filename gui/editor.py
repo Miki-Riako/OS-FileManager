@@ -85,8 +85,8 @@ class Editor(QFrame):
     def _handle_save_complete(self, file_path: str, success: bool, error_message: str):
         if success:
             InfoBar.success(
-                title='保存成功',
-                content=f"文件 '{Path(file_path).name}' 已成功保存。",
+                title='保存中',
+                content=f"文件 '{Path(file_path).name}' 正在保存。",
                 orient=Qt.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
