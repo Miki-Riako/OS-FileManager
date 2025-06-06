@@ -56,9 +56,9 @@ private:
     std::vector<std::string> cmd;                  //用户输入的整行命令
     User user;                                     //当前登录用户
     bool isSudo;                                   //是否是超管状态
-    CommandLineInterface userInterface;                   //用户接口
+    CommandLineInterface userInterface;            //用户接口
     std::vector<std::string> curPath;              //当前从根目录开始的路径
-    std::map<std::string, std::string> help; //帮助文档
+    std::map<std::string, std::string> help;       //帮助文档
 };
 
 #endif //FILESYSTEM_SHELL_H
