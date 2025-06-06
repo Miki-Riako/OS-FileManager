@@ -13,7 +13,8 @@
 
 class Shell {
 public:
-    bool debug = true;
+    // bool debug = true;
+    bool debug = false;
     Shell();
 
     //根据part分割str

@@ -21,7 +21,7 @@ Shell::Shell() {
     help["chmod"]    = "chmod <FILE> -a|t|o [r][w][x]    change file modes or Access Control Lists";
     help["cp"]       = "cp <SOURCE> <DEST>               copy files and directories";
     help["mv"]       = "mv <SOURCE> <DEST>               move (rename) files";
-    help["passwd"]   = "passwd                           update user's authentication tokens";
+    // help["passwd"]   = "passwd                           update user's authentication tokens";
     help["sudo"]     = "sudo <COMMAND>                   execute a command as another user";
     help["mkuser"]   = "mkuser <USERNAME>                create a new user or update default new user information";
     help["rmuser"]   = "rmuser <USERNAME>                delete a user account and related files";
