@@ -71,15 +71,12 @@ void Vim::changePos(int p) {
             if (cury > vs[l].size())cury = vs[l].size() + dy;
             if (r - l >= sizx - 1)r--;
         }
-    }
-    else if (p == 1 && curx == sizx - 2) {
+    } else if (p == 1 && curx == sizx - 2) {
         if (r < vs.size() - 1) {
             l++, r++;
             if (cury > vs[r].size())cury = (int)vs[r].size() + dy;
         }
-    }
-
-    else {
+    } else {
         curx += dir[p].x;
         cury += dir[p].y;
         //限制光标位置
@@ -147,9 +144,7 @@ pair<bool, string> Vim::exec() { //从键盘中读取一个字母
             else if (ch == leftArrow)changePos(2);
             else if (ch == rightArrow) { changePos(3); }
             else if (ch == del && curState == 1)insert_cmd_mode(ch, true);
-        }
-
-        else if (error) {
+        } else if (error) {
             curState = 0;
             hideCursor();
 
@@ -163,15 +158,11 @@ pair<bool, string> Vim::exec() { //从键盘中读取一个字母
             errortp = "";
             print(error, errortp);
             continue;
-        }
-
-        else if (curState == 0) {
+        } else if (curState == 0) {
             normal_cmd_mode(ch);
-        }
-        else if (curState == 1) {
+        } else if (curState == 1) {
             insert_cmd_mode(ch);
-        }
-        else if (curState == 2) {
+        } else if (curState == 2) {
             advanced_cmd_mode(ch);
         }
 
@@ -194,16 +185,12 @@ void Vim::normal_cmd_mode(int ch) { //普通命令模式
         if (l)l--, r--;
         else if (r == vs.size())r--;
 
-    }
-
-    else if (ch == 'y') { //复制
+    } else if (ch == 'y') { //复制
         cutBoard = vs[curx + l];
-    }
-    else if (ch == 'p') { //粘贴
+    } else if (ch == 'p') { //粘贴
         vs.insert(vs.begin() + curx + 1 + l, cutBoard);
         if (r - l < sizx - 2)r++;
-    }
-    else if (ch == 'x') { //删除当前光标指向的东西
+    } else if (ch == 'x') { //删除当前光标指向的东西
         if (cury == dy) {
             if (curx == 0 && l == 0)
                 return;
@@ -217,29 +204,21 @@ void Vim::normal_cmd_mode(int ch) { //普通命令模式
                 if (r == vs.size())r--;
                 if (curx)curx--;
             }
-
             return;
-
         }
 
         vs[curx + l].erase(vs[curx + l].begin() + cury - dy - 1);
         cury--;
-    }
-    else if (ch == '0') { //光标移动到开头
+    } else if (ch == '0') { //光标移动到开头
         cury = dy;
-    }
-    else if (ch == '$') {
+    } else if (ch == '$') {
         cury = vs[curx + l].size() + dy;
-    }
-    else if (ch == 'i') { //当前位置插入
-
+    } else if (ch == 'i') { //当前位置插入
         curState = 1;
-    }
-    else if (ch == 'a') { //后一个位置插入
+    } else if (ch == 'a') { //后一个位置插入
         curState = 1;
         if (cury < vs[curx + l].size() + dy)cury++;
-    }
-    else if (ch == ':') { //高级命令模式
+    } else if (ch == ':') { //高级命令模式
         curState = 2;
         curx = sizx - 1;
         cury = 1;
@@ -255,9 +234,7 @@ void Vim::insert_cmd_mode(int ch, bool fg) { //插入模式
         cout << spaces;
         gotoxy(curx, cury);
         showCursor();
-    }
-
-    else if (ch == backspace) { //删除当前字符
+    } else if (ch == backspace) { //删除当前字符
         if (cury == dy) {
             if (curx == 0 && l == 0)
                 return;
@@ -273,16 +250,12 @@ void Vim::insert_cmd_mode(int ch, bool fg) { //插入模式
             }
             return;
         }
-
         vs[curx + l].erase(vs[curx + l].begin() + cury - dy - 1);
         cury--;
-    }
-    else if (fg && ch == del) { //删除后面一个字符
+    } else if (fg && ch == del) { //删除后面一个字符
         if (cury == vs[curx + l].size() + dy)return;
         vs[curx + l].erase(vs[curx + l].begin() + cury - dy);
-    }
-
-    else if (ch == enter) {
+    } else if (ch == enter) {
         string nexs = vs[curx + l].substr(cury - dy, vs[curx + l].size() - cury + dy);
         string curs = vs[curx + l].substr(0, cury - dy);
         vs.erase(vs.begin() + curx + l);
@@ -294,8 +267,7 @@ void Vim::insert_cmd_mode(int ch, bool fg) { //插入模式
 
         if (curx == sizx - 1)curx--, l++, r++;
 
-    }
-    else if (0 <= ch && ch <= 127) {
+    } else if (0 <= ch && ch <= 127) {
         vs[curx + l].insert(vs[curx + l].begin() + cury - dy, ch);
         cury++;
     }
@@ -312,8 +284,7 @@ void Vim::advanced_cmd_mode(int ch) {
         curx = 0, cury = dy;
         gotoxy(curx, cury);
         showCursor();
-    }
-    else if (ch == backspace) {
+    } else if (ch == backspace) {
         if (!cmd.empty()) {
             cmd.pop_back(), cury--;
             hideCursor();
@@ -322,8 +293,7 @@ void Vim::advanced_cmd_mode(int ch) {
             gotoxy(curx, cury);
             showCursor();
         }
-    }
-    else if (ch == enter) {
+    } else if (ch == enter) {
         if (readonly) {
             if (cmd == "w" || cmd == "wq") {
                 error = true;
@@ -348,8 +318,7 @@ void Vim::advanced_cmd_mode(int ch) {
                 error = true;
                 errortp = "No such command                         ";
             }
-        }
-        else {
+        } else {
             if (cmd == "w") {
                 isSave = true;
                 vs_save = merge_string();
@@ -363,16 +332,13 @@ void Vim::advanced_cmd_mode(int ch) {
                 gotoxy(curx, cury);
                 showCursor();
 
-            }
-            else if (cmd == "wq") {
+            } else if (cmd == "wq") {
                 isSave = true;
                 vs_save = merge_string();
                 quit = true;
-            }
-            else if (cmd == "q!") {
+            } else if (cmd == "q!") {
                 quit = true;
-            }
-            else if (cmd == "q") {
+            } else if (cmd == "q") {
                 if (vs == init_vs) //没有修改改过
                 {
                     quit = true;
@@ -381,17 +347,14 @@ void Vim::advanced_cmd_mode(int ch) {
                     error = true;
                     errortp = "You have already editted this document   ";
                 }
-            }
-            else {
+            } else {
                 error = true;
                 errortp = "No such command                         ";
             }
         }
 
         cmd.clear();
-    }
-
-    else if (0 <= ch && ch <= 127 && cmd.size() < 2) {
+    } else if (0 <= ch && ch <= 127 && cmd.size() < 2) {
         cury++;
         cmd += ch;
     }
@@ -437,8 +400,7 @@ void Vim::printcmd(bool error, const string& errortp) { //分别于左下角，�
 
     if (curState == 1) {
         cout << "-- INSERT --                 ";
-    }
-    else if (curState == 2) {
+    } else if (curState == 2) {
         cout << ":                           ";
         gotoxy(sizx - 1, 1);
         cout << cmd;
