@@ -43,6 +43,7 @@ class Terminal(QWidget):
         self.tabBoxLayout = QHBoxLayout()
         self.tabBar = TabBar(self)
         self.runButton = TransparentToolButton(FIF.PLAY.icon(color=QColor(206, 206, 206) if isDarkTheme() else QColor(96, 96, 96)), self)
+        self.runShortcut = QShortcut(QKeySequence("Ctrl+R"), self)
         self.stackedWidget = QStackedWidget(self)
 
         self.next_unique_tab_id = 0
@@ -67,6 +68,7 @@ class Terminal(QWidget):
     def __initWidget(self):
         self.__initLayout()
         self.__initButton()
+        self.__initShortcut()
         self.tabBar.currentChanged.connect(self.onTabChanged)
         self.tabBar.tabAddRequested.connect(self.onTabAddRequested)
         self.tabBar.tabCloseRequested.connect(self.onTabCloseRequested)
@@ -84,6 +86,9 @@ class Terminal(QWidget):
 
     def __initButton(self):
         self.runButton.clicked.connect(self.run)
+
+    def __initShortcut(self):
+        self.runShortcut.activated.connect(self.run)
 
     def _get_terminal_widget_by_object_name(self, object_name: str) -> PlainTextEdit:
         """根据 objectName 获取对应的 PlainTextEdit 实例。"""
@@ -620,10 +625,6 @@ class Terminal(QWidget):
         return True
 
     def save_file_content_from_editor(self, file_path: str, content: str) -> bool:
-        """
-        Saves file content from the editor by sending multiple echo commands.
-        The result will be emitted via editorSaveComplete signal.
-        """
         api = self.get_current_api()
         if not api:
             self._send_special_command_error("", "没有激活的终端API实例可供编辑器使用。", "save_file_content", file_path)
@@ -648,19 +649,14 @@ class Terminal(QWidget):
         commands = []
         if lines:
             # 第一行使用 > 覆盖
-            # 先对内容进行转义，得到一个不包含反斜杠的字符串变量，再插入到 f-string
             escaped_first_line_content = lines[0].replace('"', '\\"')
-            commands.append(f'echo "{escaped_first_line_content}" > "{file_path}"') # <<<<<< 修改这一行
-
+            commands.append(f'echo "{escaped_first_line_content}" > {file_path}')
             # 后续行使用 >> 追加
             for line in lines[1:]:
                 escaped_line_content = line.replace('"', '\\"')
-                commands.append(f'echo "{escaped_line_content}" >> "{file_path}"') # <<<<<< 修改这一行
-        else:
-            # 如果内容为空，则清空文件
-            commands.append(f'echo "" > "{file_path}"') # <<<<<< 保持不变，或者改为 f'echo "" > "{file_path}"' 也行
-
-
+                commands.append(f'echo "{escaped_line_content}" >> {file_path}')
+        else: # 如果内容为空，则清空文件
+            commands.append(f'echo "" > {file_path}')
 
         self._explorer_current_api_obj_name = terminal_obj_name
         self._explorer_command_sent_at_index = len(text_edit.document().toPlainText())
@@ -671,9 +667,7 @@ class Terminal(QWidget):
             "file_path": file_path,
             "command_queue": commands # Store all commands to be executed sequentially
         }
-
-        # Send the first command immediately
-        if commands:
+        if commands: # Send the first command immediately
             first_command = commands.pop(0)
             self._append_to_terminal(text_edit, first_command + '\n')
             api.send_input_to_app(first_command)

@@ -680,6 +680,9 @@ void Shell::cmd_echo() {
         }
         std::string content_to_process = cmd[1]; // 用户输入的待写入内容
         std::string target_file_path = cmd[3]; // 目标文件路径
+        if (!target_file_path.empty() && target_file_path[0] == '~') {
+            target_file_path = target_file_path.substr(1);
+        }
         bool append = (cmd[2] == ">>");       // 是否是追加模式
         // 解析文件路径和文件名
         std::vector<std::string> path_parts = split_path(target_file_path);

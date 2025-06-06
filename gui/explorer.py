@@ -567,7 +567,7 @@ class Explorer(QWidget):
     def openFile(self, file_data: FileData):
         full_file_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
         self.terminal_manager.request_file_content_for_editor(full_file_path)
-        self._show_infobar("加载文件", f"正在加载文件 '{file_data.name}'...", InfoBarPosition.TOP)
+        self._show_infobar("加载文件", f"正在加载文件 '{file_data.name}'，请切换到 editor 区域编辑...", InfoBarPosition.TOP)
 
     def search(self, keyWord: str):
         # 清除当前选中项和信息面板

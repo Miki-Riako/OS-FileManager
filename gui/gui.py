@@ -42,6 +42,8 @@ class GUI(FluentWindow):
         self.settingInterface  = Setting('Setting Interface', self)
 
         self.terminalInterface.editorContentReady.connect(self._handle_editor_content_ready)
+        self.editor.saveFileRequested.connect(self.terminalInterface.save_file_content_from_editor)
+        self.terminalInterface.editorSaveComplete.connect(self.editor._handle_save_complete)
 
         self.initNavigation()
         self.splashScreen.finish()
