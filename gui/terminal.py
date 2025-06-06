@@ -51,6 +51,7 @@ class Terminal(QWidget):
         self.input_start_indices = {}
         self.terminal_modes = {}
         self.password_buffers = {}
+        self.current_paths_by_terminal = {}
 
         # 状态追踪：用于Explorer的命令执行
         self._explorer_pending_requests = {} # {terminal_object_name: {"output_buffer": []}}
@@ -153,6 +154,21 @@ class Terminal(QWidget):
         self.terminal_modes[terminal_object_name],\
         self.input_start_indices[terminal_object_name]\
             = self._determine_terminal_state(full_text)
+
+        extracted_path = "~"
+        prompt_matches = list(self.main_shell_prompt_regex.finditer(full_text)) # 重新从 full_text 中匹配最新的主 shell 提示符，提取路径
+        if prompt_matches:
+            last_prompt_match = prompt_matches[-1] # 取最后一个匹配，确保是最新提示符
+            prompt_full_text = last_prompt_match.group(0).strip()
+            path_start_index = prompt_full_text.find(":") + 1
+            path_end_index = prompt_full_text.rfind("$") # 使用 rfind 确保找到最后一个 $
+            if path_start_index != -1 and path_end_index != -1 and path_start_index < path_end_index:
+                extracted_path_from_prompt = prompt_full_text[path_start_index:path_end_index].strip()
+                if extracted_path_from_prompt == "":
+                    extracted_path = "~"
+                else:
+                    extracted_path = extracted_path_from_prompt.replace('//', '/')
+        self.current_paths_by_terminal[terminal_object_name] = extracted_path
 
         if terminal_object_name == self._explorer_current_api_obj_name and self._explorer_command_sent_at_index != -1:
             self._process_special_command_output(terminal_object_name, output, is_error, full_text)
@@ -518,6 +534,7 @@ class Terminal(QWidget):
         self.terminal_modes.pop(route_key, None) # 移除模式和密码缓冲区状态
         self.input_start_indices.pop(route_key, None)
         self.password_buffers.pop(route_key, None)
+        self.current_paths_by_terminal.pop(route_key, None)
 
         widget_to_remove = self.stackedWidget.findChild(PlainTextEdit, route_key)
         if widget_to_remove:
@@ -675,3 +692,6 @@ class Terminal(QWidget):
         else: # Should not happen if lines processing is correct
             self._send_special_command_error(terminal_obj_name, "没有生成保存命令。", "save_file_content", file_path)
             return False
+
+    def get_current_terminal_path(self, terminal_object_name: str) -> str:
+        return self.current_paths_by_terminal.get(terminal_object_name, "~")

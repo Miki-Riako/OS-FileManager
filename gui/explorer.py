@@ -206,10 +206,8 @@ class Explorer(QWidget):
         super().__init__(parent=parent)
         self.setupUi()
         self.terminal_manager = terminal_manager
-        self.terminal_manager.requestExplorerRefresh.connect(
-            self.load_current_terminal_directory)
-        self.terminal_manager.explorerCommandOutputReady.connect(
-            self._handle_explorer_command_response)
+        self.terminal_manager.requestExplorerRefresh.connect(self.load_current_terminal_directory)
+        self.terminal_manager.explorerCommandOutputReady.connect(self._handle_explorer_command_response)
 
         self.trie = Trie()
         # Initial path in Explorer view, matches Shell's initial login path
@@ -354,25 +352,11 @@ class Explorer(QWidget):
             self.clear_file_display()
             return
 
-        extracted_path = "~"  # 默认值
-        match = self._prompt_regex.search(raw_output)
-        if match:
-            prompt_full = match.group(0).strip()
-            path_start_index = prompt_full.find(":") + 1
-            path_end_index = prompt_full.find("$")
-            if path_start_index != -1 and path_end_index != -1 and path_start_index < path_end_index:
-                extracted_path = prompt_full[path_start_index:path_end_index].strip(
-                )
-                if extracted_path == "":
-                    extracted_path = "~"
-                else:
-                    extracted_path = extracted_path.replace('//', '/')
-        self.current_path = extracted_path  # 始终更新当前路径，使其与终端同步
+        self.current_path = self.terminal_manager.get_current_terminal_path(terminal_obj_name)
+        self.pathLabel.setText(f"Current Path: {self.current_path}") # 立即更新 UI 显示
 
         if command_type.startswith("cd"):  # 'cd' 命令成功完成
-            self._show_infobar(
-                "目录切换成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
-            self.terminal_manager.execute_command_for_explorer("ls -l")
+            self._show_infobar("目录切换成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
         elif command_type.startswith("ls"):  # 'ls' 命令成功完成，现在解析输出并填充 UI
             self._parse_ls_output_and_populate_cards(raw_output)
             # self._show_infobar("目录加载成功", f"当前路径：{self.current_path}", InfoBarPosition.TOP)
@@ -553,13 +537,11 @@ class Explorer(QWidget):
 
     def handleDoubleClick(self, file_data: FileData):
         """ Handles double-click event on a file/directory icon. """
-        _, is_directory_for_action = FileIcon._determine_icon_and_type(
-            file_data.name, file_data.access)
+        _, is_directory_for_action = FileIcon._determine_icon_and_type(file_data.name, file_data.access)
 
         if is_directory_for_action:
             self.searchLineEdit.clear()  # 清空搜索框
-            target_path = Explorer._get_item_logical_path(
-                self.current_path, file_data.name)
+            target_path = Explorer._get_item_logical_path(self.current_path, file_data.name)
             self.load_files(target_path)
         else:
             self.openFile(file_data)

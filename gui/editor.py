@@ -58,15 +58,15 @@ class Editor(QFrame):
             return
         file_content = self.editor_space.toPlainText()
         self.saveFileRequested.emit(self.current_file_path, file_content) # 发出信号，请求 Terminal 执行保存操作
-        InfoBar.info( # 立即显示正在保存的提示
-            title='保存中',
-            content=f"正在保存 '{Path(self.current_file_path).name}'...",
-            orient=Qt.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=2000,
-            parent=self
-        )
+        # InfoBar.info( # 立即显示正在保存的提示
+        #     title='保存中',
+        #     content=f"正在保存 '{Path(self.current_file_path).name}'...",
+        #     orient=Qt.Horizontal,
+        #     isClosable=True,
+        #     position=InfoBarPosition.TOP,
+        #     duration=2000,
+        #     parent=self
+        # )
 
     def load_content(self, file_path: str, content: str):
         self.current_file_path = file_path
